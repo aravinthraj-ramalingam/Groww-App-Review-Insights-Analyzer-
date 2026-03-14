@@ -7,3 +7,7 @@
 **/*.db
 **/data/
 **/.DS_Store
+**/dist
+**/scripts
+**/*.txt
+**/.qoder
