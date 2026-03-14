@@ -1,35 +1,26 @@
-# Multi-stage build for production
-# Build for Render deployment
-FROM node:20-alpine AS builder
+# Single-stage build for Render deployment
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Install build dependencies for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
-# Copy all source files (excluding files in .dockerignore)
-COPY . .
+# Copy package files first
+COPY package*.json ./
 
-# Install dependencies
+# Install all dependencies (including devDependencies for build)
 RUN npm ci
+
+# Copy source code
+COPY tsconfig.json ./
+COPY src ./src
 
 # Build TypeScript
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine AS production
-
-WORKDIR /app
-
-# Install runtime dependencies for better-sqlite3
-RUN apk add --no-cache python3 make g++
-
-# Copy package files
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
+# Remove devDependencies to reduce image size
+RUN npm prune --production
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
