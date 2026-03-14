@@ -1,0 +1,22 @@
+[dotenv@17.3.1] injecting env (9) from .env -- tip: =É¢Ìn+≈ auth for agents: https://vestauth.com
+[dotenv@17.3.1] injecting env (0) from .env -- tip: G‹Ìn+≈ secrets for agents: https://dotenvx.com/as2
+--- Initializing DB Pipeline ---
+[INFO] Phase 2 schema initialized { databaseFile: '../phase-1/phase1.db' }
+
+--- 1. Generating Themes ---
+Loaded 200 recent reviews.
+Generated 5 themes.
+
+--- 2. Assigning Themes for week 2026-03-09 ---
+Assigned themes: { assigned: 54, skipped: 6, themes: 5 }
+
+--- 3. Generating Weekly Pulse ---
+System.Management.Automation.RemoteException
+G•Ó Pipeline failed:
+SyntaxError: Bad control character in string literal in JSON at position 136
+    at JSON.parse (<anonymous>)
+    at groqJson (C:\Users\santh\OneDrive\Desktop\Groww-App-Review-Insights-Analyzer-\phase-2\src\services\groqClient.ts:33:15)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async generateWeeklyNote (C:\Users\santh\OneDrive\Desktop\Groww-App-Review-Insights-Analyzer-\phase-2\src\services\pulseService.ts:159:15)
+    at async generatePulse (C:\Users\santh\OneDrive\Desktop\Groww-App-Review-Insights-Analyzer-\phase-2\src\services\pulseService.ts:215:20)
+    at async runFullPipeline (C:\Users\santh\OneDrive\Desktop\Groww-App-Review-Insights-Analyzer-\phase-2\scripts\runPulsePipeline.ts:37:19)

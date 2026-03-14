@@ -1,0 +1,58 @@
+﻿[dotenv@17.3.1] injecting env (9) from .env -- tip: ΓÜÖ∩╕Å  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ΓÜÖ∩╕Å  suppress all logs with { quiet: true }
+--- Initializing DB Pipeline ---
+[INFO] Phase 2 schema initialized { databaseFile: '../phase-1/phase1.db' }
+
+--- 1. Generating Themes ---
+Loaded 200 recent reviews.
+Generated 5 themes.
+
+--- 2. Assigning Themes for week 2026-03-09 ---
+Assigned themes: { assigned: 43, skipped: 17, themes: 5 }
+
+--- 3. Generating Weekly Pulse ---
+npx : 
+At line:1 char:1
++ npx ts-node 
+scripts/runPulsePipeline.ts 
+> out.log 2>&1 ; Get-Content 
+ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (:String  
+  ) [], RemoteException
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+Γ¥î Pipeline failed:
+SyntaxError: Bad control 
+character in string literal 
+in JSON at position 9
+    at JSON.parse 
+(<anonymous>)
+    at groqJson (C:\Users\san
+th\OneDrive\Desktop\Groww-App
+-Review-Insights-Analyzer-\ph
+ase-2\src\services\groqClient
+.ts:33:15)
+    at 
+processTicksAndRejections (no
+de:internal/process/task_queu
+es:95:5)
+    at async 
+generateWeeklyNote (C:\Users\
+santh\OneDrive\Desktop\Groww-
+App-Review-Insights-Analyzer-
+\phase-2\src\services\pulseSe
+rvice.ts:159:15)
+    at async generatePulse (C
+:\Users\santh\OneDrive\Deskto
+p\Groww-App-Review-Insights-A
+nalyzer-\phase-2\src\services
+\pulseService.ts:215:20)
+    at async runFullPipeline 
+(C:\Users\santh\OneDrive\Desk
+top\Groww-App-Review-Insights
+-Analyzer-\phase-2\scripts\ru
+nPulsePipeline.ts:37:19)

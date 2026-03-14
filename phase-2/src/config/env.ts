@@ -1,6 +1,8 @@
 import path from 'path';
+import * as dotenv from 'dotenv';
 
 const repoRoot = path.resolve(__dirname, '..', '..', '..');
+dotenv.config({ path: path.join(repoRoot, 'phase-2', '.env') });
 
 export const config = {
   // Phase 2 extends the same SQLite DB created in phase 1 by default.

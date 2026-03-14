@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: groww-review-insights-backend
+    runtime: docker
+    repo: https://github.com/yourusername/groww-review-insights
+    dockerfilePath: ./phase-2/Dockerfile
+    dockerContext: ./phase-2
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4002
+      - key: DATABASE_FILE
+        value: /app/data/phase1.db
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+    disk:
+      name: data
+      mountPath: /app/data
+      sizeGB: 1
