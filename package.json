@@ -1,9 +1,9 @@
 {
   "name": "groww-review-insights-root",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
-    "build": "cd phase-3 && npm install && npm run build",
+    "build": "cd phase-3 && npm install && npm run build && cp -r dist ../dist",
     "dev": "cd phase-3 && npm run dev"
   }
 }
