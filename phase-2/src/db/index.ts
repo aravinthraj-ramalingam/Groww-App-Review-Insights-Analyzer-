@@ -5,6 +5,27 @@ import { logInfo } from '../core/logger';
 export const db = new Database(config.databaseFile);
 
 export function initSchema(): void {
+  // Reviews table (from Phase 1 - needed for stats)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id TEXT PRIMARY KEY,
+      platform TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      title TEXT,
+      text TEXT NOT NULL,
+      clean_text TEXT,
+      author TEXT,
+      created_at TEXT NOT NULL,
+      week_start TEXT NOT NULL,
+      week_end TEXT NOT NULL,
+      has_unicode INTEGER DEFAULT 0
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_reviews_week_start ON reviews (week_start);
+  `);
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS themes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
