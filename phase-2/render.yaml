@@ -2,7 +2,7 @@ services:
   - type: web
     name: groww-review-insights-backend
     runtime: docker
-    repo: https://github.com/yourusername/groww-review-insights
+    repo: https://github.com/aravinthraj-ramalingam/Groww-App-Review-Insights-Analyzer-
     dockerfilePath: ./phase-2/Dockerfile
     dockerContext: ./phase-2
     envVars:

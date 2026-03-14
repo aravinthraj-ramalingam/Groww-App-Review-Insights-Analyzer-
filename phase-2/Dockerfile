@@ -1,14 +1,19 @@
 # Multi-stage build for production
+# Use phase-2 as the build context
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Install dependencies for better-sqlite3
+RUN apk add --no-cache python3 make g++
+
+# Copy package files first for better caching
 COPY package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY . .
+COPY tsconfig.json ./
+COPY src ./src
 
 # Build TypeScript
 RUN npm run build

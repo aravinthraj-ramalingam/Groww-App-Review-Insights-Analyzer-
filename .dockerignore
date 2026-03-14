@@ -1,0 +1,9 @@
+# Root level dockerignore
+**/node_modules
+**/.git
+**/.env
+**/.env.local
+**/*.log
+**/*.db
+**/data/
+**/.DS_Store
