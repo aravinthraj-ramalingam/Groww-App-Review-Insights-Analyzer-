@@ -6,15 +6,11 @@ WORKDIR /app
 # Install build dependencies for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
-# Copy package files first
-COPY package*.json ./
+# Copy all files from build context
+COPY . .
 
 # Install all dependencies (including devDependencies for build)
 RUN npm ci
-
-# Copy source code
-COPY tsconfig.json ./
-COPY src ./src
 
 # Build TypeScript
 RUN npm run build
