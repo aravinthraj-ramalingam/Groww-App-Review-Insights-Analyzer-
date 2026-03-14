@@ -15,7 +15,12 @@ import { startScheduler } from '../jobs/schedulerJob';
 import { db } from '../db';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-initSchema();
+initSchema().then(() => {
+  logInfo('Database initialized');
+}).catch(err => {
+  logError('Failed to initialize database', err);
+  process.exit(1);
+});
 
 const app = express();
 

@@ -1,10 +1,26 @@
 import Database from 'better-sqlite3';
 import { config } from '../config/env';
 import { logInfo } from '../core/logger';
+import { getPool, initPostgresSchema, closePool } from './postgres';
 
-export const db = new Database(config.databaseFile);
+// Determine which database to use
+const usePostgres = !!process.env.DATABASE_URL;
 
-export function initSchema(): void {
+// SQLite database (for local development)
+export let db: Database.Database;
+
+// Initialize database based on environment
+export async function initSchema(): Promise<void> {
+  if (usePostgres) {
+    await initPostgresSchema();
+  } else {
+    initSQLiteSchema();
+  }
+}
+
+function initSQLiteSchema(): void {
+  db = new Database(config.databaseFile);
+  
   // Reviews table (from Phase 1 - needed for stats)
   db.exec(`
     CREATE TABLE IF NOT EXISTS reviews (
@@ -108,6 +124,9 @@ export function initSchema(): void {
     ON scheduled_jobs (status, scheduled_at_utc);
   `);
 
-  logInfo('Phase 2 schema initialized', { databaseFile: config.databaseFile });
+  logInfo('SQLite schema initialized', { databaseFile: config.databaseFile });
 }
+
+export { getPool, closePool };
+export const isPostgres = () => usePostgres;
 
