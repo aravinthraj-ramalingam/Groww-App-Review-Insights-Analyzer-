@@ -27,17 +27,22 @@
 - [phase-2 scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 - [phase-2 schema.test.ts](file://phase-2/src/tests/schema.test.ts)
 - [phase-2 userPrefs.test.ts](file://phase-2/src/tests/userPrefs.test.ts)
+- [root package.json](file://package.json)
+- [vercel.json](file://phase-3/vercel.json)
+- [vite.config.ts](file://phase-3/vite.config.ts)
+- [phase-3 package.json](file://phase-3/package.json)
+- [index.html](file://phase-3/index.html)
+- [App.tsx](file://phase-3/src/App.tsx)
+- [main.tsx](file://phase-3/src/main.tsx)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated Docker build configuration from multi-stage to single-stage build optimized for Render deployment
-- Moved Dockerfile from phase-2/ to root directory for simplified containerization
-- Enhanced build dependencies installation and post-build cleanup process with npm prune --production
-- Updated .dockerignore patterns at root level with comprehensive exclusion patterns
-- Updated render.yaml to reflect new Dockerfile location and context
-- Enhanced health check configuration in both Dockerfile and docker-compose.yml
-- Added comprehensive containerization documentation with single-stage build optimization
+- Added comprehensive Vercel deployment configuration for the React frontend in phase-3
+- Implemented centralized build orchestration through root package.json with cross-phase build coordination
+- Documented Vercel framework support with Vite configuration and client-side routing rewrite rules
+- Updated deployment architecture to include frontend deployment alongside backend containerization
+- Enhanced build process with streamlined multi-phase coordination for development and production
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -50,24 +55,25 @@
 8. [Monitoring & Logging](#monitoring--logging)
 9. [Environment Setup](#environment-setup)
 10. [Containerization & Orchestration](#containerization--orchestration)
-11. [Scaling & High Availability](#scaling--high-availability)
-12. [Security & Compliance](#security--compliance)
-13. [Backup & Recovery](#backup--recovery)
-14. [Disaster Recovery Planning](#disaster-recovery-planning)
-15. [Maintenance & Scheduling](#maintenance--scheduling)
-16. [Testing Framework](#testing-framework)
-17. [Troubleshooting Guide](#troubleshooting-guide)
-18. [Runbooks](#runbooks)
-19. [Conclusion](#conclusion)
+11. [Frontend Deployment with Vercel](#frontend-deployment-with-vercel)
+12. [Scaling & High Availability](#scaling--high-availability)
+13. [Security & Compliance](#security--compliance)
+14. [Backup & Recovery](#backup--recovery)
+15. [Disaster Recovery Planning](#disaster-recovery-planning)
+16. [Maintenance & Scheduling](#maintenance--scheduling)
+17. [Testing Framework](#testing-framework)
+18. [Troubleshooting Guide](#troubleshooting-guide)
+19. [Runbooks](#runbooks)
+20. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive deployment and operations guidance for the Groww App Review Insights Analyzer. It covers environment setup across development, staging, and production, containerization and orchestration strategies, monitoring and logging, backup and recovery, scaling and high availability, security and compliance, testing frameworks, and operational runbooks for troubleshooting and maintenance.
+This document provides comprehensive deployment and operations guidance for the Groww App Review Insights Analyzer. It covers environment setup across development, staging, and production, containerization and orchestration strategies, frontend deployment with Vercel, monitoring and logging, backup and recovery, scaling and high availability, security and compliance, testing frameworks, and operational runbooks for troubleshooting and maintenance.
 
 ## Project Structure
-The repository is split into three phases:
+The repository is split into three phases with integrated frontend deployment:
 - Phase 1: Core scraping, filtering, and SQLite storage with a small HTTP API.
 - Phase 2: Enhanced with theming, weekly pulse generation, scheduled email delivery, and persistence of user preferences and scheduled jobs.
-- Phase 3: Frontend dashboard application.
+- Phase 3: Complete React frontend dashboard with client-side routing and Vercel deployment configuration.
 
 Key runtime components:
 - HTTP servers for each phase
@@ -76,6 +82,7 @@ Key runtime components:
 - Email transport via SMTP
 - Structured logging
 - Comprehensive testing framework using Node.js built-in test runner
+- React-based frontend with Vercel deployment support
 
 ```mermaid
 graph TB
@@ -91,6 +98,10 @@ EMAIL["Email Service<br/>sendPulseEmail(), sendTestEmail()"]
 GROQ["Groq Client<br/>groqJson()"]
 TESTS["Testing Framework<br/>Node.js built-in test runner"]
 end
+subgraph "Phase 3 - Frontend"
+FRONTEND["React Dashboard<br/>Vite + React Router"]
+VERCEL["Vercel Deployment<br/>Framework Support"]
+end
 subgraph "Containerization"
 DOCKER["Single-stage Docker Build<br/>Root-level Dockerfile"]
 K8S["Kubernetes Deployment<br/>Render YAML"]
@@ -103,6 +114,8 @@ SCH --> EMAIL
 P2S --> GROQ
 P2S --> P2DB
 P2S --> TESTS
+FRONTEND --> P2S
+FRONTEND --> VERCEL
 DOCKER --> P2S
 K8S --> DOCKER
 COMPOSE --> DOCKER
@@ -116,6 +129,8 @@ COMPOSE --> DOCKER
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
+- [phase-3 vite.config.ts:1-20](file://phase-3/vite.config.ts#L1-L20)
 - [Dockerfile:1-42](file://Dockerfile#L1-L42)
 - [docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
 - [render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
@@ -125,6 +140,7 @@ COMPOSE --> DOCKER
 - [phase-2 server:1-266](file://phase-2/src/api/server.ts#L1-L266)
 - [phase-1 db:1-31](file://phase-1/src/db/index.ts#L1-L31)
 - [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 
 ## Core Components
 - HTTP Servers
@@ -143,6 +159,8 @@ COMPOSE --> DOCKER
   - Console-based logging with INFO/ERROR helpers.
 - Testing Framework
   - Comprehensive test suite using Node.js built-in test runner with isolated test files for different components.
+- Frontend Dashboard
+  - React-based dashboard with client-side routing, integrated with backend APIs via proxy configuration.
 
 **Section sources**
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
@@ -154,25 +172,29 @@ COMPOSE --> DOCKER
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
 - [phase-2 theme service:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [phase-2 logger:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 
 ## Architecture Overview
-The system comprises two primary runtime phases with containerized deployment capabilities:
+The system comprises two primary runtime phases with containerized deployment capabilities and a modern frontend deployment strategy:
 - Phase 1: Standalone API for scraping and storing reviews into SQLite.
 - Phase 2: Full-featured API with theming, pulse generation, scheduled emails, and persistence.
+- Phase 3: React frontend with Vercel deployment and client-side routing.
 
 ```mermaid
 sequenceDiagram
 participant Client as "Client"
+participant Vercel as "Vercel Frontend"
 participant P2Server as "Phase 2 Server"
 participant Scheduler as "Scheduler"
 participant Pulse as "Pulse Service"
 participant Email as "Email Service"
 participant DB as "SQLite"
-Client->>P2Server : POST /api/pulses/generate { week_start }
+Client->>Vercel : React Dashboard Access
+Vercel->>P2Server : API Calls (/api/*)
 P2Server->>Pulse : generatePulse(week_start)
 Pulse->>DB : read themes, reviews, week stats
 Pulse-->>P2Server : WeeklyPulse
-P2Server-->>Client : { ok, pulse }
+P2Server-->>Vercel : { ok, pulse }
 Note over Scheduler,P2Server : On startup (if GROQ_API_KEY present)
 Scheduler->>P2Server : runSchedulerOnce()
 P2Server->>Pulse : generatePulse(weekStart)
@@ -187,6 +209,7 @@ P2Server->>DB : update scheduled_jobs
 - [phase-2 pulse service:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [phase-2 email service:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
 - [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-3 vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
 
 ## Detailed Component Analysis
 
@@ -345,10 +368,13 @@ Update --> Loop
   - DATABASE_FILE, PORT.
 - Phase 2
   - DATABASE_FILE, PORT, GROQ_API_KEY, GROQ_MODEL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
+- Phase 3 (Frontend)
+  - Vite configuration with React Router and proxy setup for API communication.
 
 **Section sources**
 - [phase-1 env:1-6](file://phase-1/src/config/env.ts#L1-L6)
 - [phase-2 env:1-23](file://phase-2/src/config/env.ts#L1-L23)
+- [phase-3 vite.config.ts:6-14](file://phase-3/vite.config.ts#L6-L14)
 
 ## Dependency Analysis
 - Runtime dependencies
@@ -357,9 +383,12 @@ Update --> Loop
   - groq-sdk for LLM integration.
   - nodemailer for SMTP.
   - zod for schema validation.
+  - React ecosystem for frontend (React, React DOM, React Router DOM).
 - Build/test/dev dependencies
   - TypeScript, ts-node, @types packages.
   - Node.js built-in test runner for comprehensive testing.
+  - Vite for frontend bundling and development server.
+  - React development dependencies for frontend build process.
 
 ```mermaid
 graph LR
@@ -371,16 +400,23 @@ P2Server --> Zod["zod"]
 P1Server["phase-1 server"] --> Express
 P1Server --> DB
 P1Server --> GPS["google-play-scraper"]
+FRONTEND["phase-3 frontend"] --> React["react"]
+FRONTEND --> ReactDOM["react-dom"]
+FRONTEND --> Router["react-router-dom"]
+FRONTEND --> Axios["axios"]
+Vite["vite"] --> FRONTEND
 TESTS["Node.js Test Runner"] --> P2Server
 ```
 
 **Diagram sources**
 - [phase-1 package.json:13-24](file://phase-1/package.json#L13-L24)
 - [phase-2 package.json:13-28](file://phase-2/package.json#L13-L28)
+- [phase-3 package.json:11-16](file://phase-3/package.json#L11-L16)
 
 **Section sources**
 - [phase-1 package.json:1-26](file://phase-1/package.json#L1-L26)
 - [phase-2 package.json:1-30](file://phase-2/package.json#L1-L30)
+- [phase-3 package.json:1-28](file://phase-3/package.json#L1-L28)
 
 ## Performance Considerations
 - Database
@@ -392,6 +428,9 @@ TESTS["Node.js Test Runner"] --> P2Server
   - Single-threaded Node process; scale horizontally behind a load balancer.
 - Caching
   - Consider caching recent themes and pulses if read-heavy.
+- Frontend Performance
+  - React component memoization and lazy loading for optimal bundle sizes.
+  - Vite's development server with hot module replacement for fast iteration.
 
 ## Monitoring & Logging
 - Logging
@@ -410,6 +449,7 @@ TESTS["Node.js Test Runner"] --> P2Server
   - Install dependencies for the desired phase.
   - Set environment variables for the target phase.
   - Start the server using dev scripts.
+  - For frontend development, use Vite's development server with proxy configuration.
 - Staging
   - Use a dedicated database file and SMTP credentials.
   - Enable scheduler only when Groq API key is available.
@@ -499,6 +539,52 @@ Local development environment with persistent storage and environment variable m
 - [.dockerignore:1-14](file://.dockerignore#L1-L14)
 - [phase-2 .dockerignore:1-12](file://phase-2/.dockerignore#L1-L12)
 
+## Frontend Deployment with Vercel
+
+### Vercel Configuration for React Frontend
+**New** The project now includes comprehensive Vercel deployment configuration for the React frontend in phase-3:
+
+**Vercel Configuration Details**
+- Framework Support: Vite framework detection for optimized build process
+- Build Command: Uses root package.json script to coordinate multi-phase build
+- Output Directory: dist folder containing compiled React application
+- Install Command: npm install for frontend dependencies
+- Rewrites: Client-side routing support with catch-all rewrite to index.html
+
+**Rewrite Rules for Client-Side Routing**
+The Vercel configuration includes rewrite rules that enable client-side routing for the React application:
+- Source pattern: "/(.*)" matches all routes
+- Destination: "/index.html" serves the React app for all client-side routes
+- Enables deep linking and bookmarkable URLs without server configuration
+
+**Centralized Build Orchestration**
+The root package.json coordinates the build process across all phases:
+- Build script: `cd phase-3 && npm install && npm run build && cp -r dist ../dist`
+- Development script: `cd phase-3 && npm run dev`
+- Ensures frontend build completes before overall deployment
+
+**Frontend Application Architecture**
+- React 18 with TypeScript
+- React Router DOM for client-side navigation
+- Vite for fast development and optimized production builds
+- Proxy configuration for API communication during development
+- Modern CSS and responsive design
+
+**Development Workflow**
+- Frontend development server runs on port 3000
+- API proxy routes requests from /api to backend server
+- Hot module replacement for rapid development iteration
+- Source maps enabled for debugging
+
+**Section sources**
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
+- [root package.json:5-8](file://package.json#L5-L8)
+- [vite.config.ts:1-20](file://phase-3/vite.config.ts#L1-L20)
+- [phase-3 package.json:1-28](file://phase-3/package.json#L1-L28)
+- [index.html:1-14](file://phase-3/index.html#L1-L14)
+- [App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
+- [main.tsx:1-14](file://phase-3/src/main.tsx#L1-L14)
+
 ## Scaling & High Availability
 - Stateless API
   - Keep servers stateless; rely on shared database for state.
@@ -512,6 +598,10 @@ Local development environment with persistent storage and environment variable m
   - Horizontal pod autoscaling based on CPU/memory or custom metrics
   - Rolling updates with readiness/liveness probes
   - Persistent volume claims for stateful containers
+- Frontend Scaling
+  - Vercel's global CDN ensures optimal frontend delivery
+  - Automatic scaling based on traffic demands
+  - Edge caching for improved performance
 
 ## Security & Compliance
 - Secrets Management
@@ -531,6 +621,10 @@ Local development environment with persistent storage and environment variable m
   - Minimal base images with security scanning
   - Environment variable management for secrets
   - **Updated**: Enhanced .dockerignore patterns prevent accidental inclusion of sensitive files
+- Frontend Security
+  - Vercel's security features protect against common web vulnerabilities
+  - HTTPS enforcement and security headers
+  - Content Security Policy configuration
 
 ## Backup & Recovery
 - Backups
@@ -544,6 +638,9 @@ Local development environment with persistent storage and environment variable m
 - Container Data Persistence
   - Persistent volume snapshots for containerized deployments
   - Volume backup strategies for stateful applications
+- Frontend Data
+  - Static assets cached by Vercel's CDN
+  - Versioned builds for reliable rollbacks
 
 ## Disaster Recovery Planning
 - RTO/RPO Targets
@@ -556,6 +653,10 @@ Local development environment with persistent storage and environment variable m
   - Multi-region container deployments
   - Volume replication for persistent data
   - Automated failover mechanisms
+- Frontend DR
+  - Vercel's global infrastructure provides natural redundancy
+  - Edge locations ensure geographic distribution
+  - Automatic failover to nearest edge location
 
 ## Maintenance & Scheduling
 - Routine Tasks
@@ -568,6 +669,10 @@ Local development environment with persistent storage and environment variable m
   - Regular container image updates and security patches
   - Volume cleanup and optimization
   - Log rotation and cleanup policies
+- Frontend Maintenance
+  - Regular dependency updates for React ecosystem
+  - Performance monitoring and optimization
+  - Security updates for build tools and dependencies
 
 ## Testing Framework
 
@@ -631,12 +736,18 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Check Docker health checks; verify environment variables; inspect container logs.
 - Testing Failures
   - Run individual test suites; check in-memory database initialization; validate stub implementations.
+- Frontend Issues
+  - Verify Vercel deployment status; check console for JavaScript errors.
+  - Ensure API proxy configuration is working during development.
+  - Validate client-side routing with rewrite rules.
 
 **Section sources**
 - [phase-2 server:22-22](file://phase-2/src/api/server.ts#L22-L22)
 - [phase-2 scheduler:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
 - [phase-2 email service:99-112](file://phase-2/src/services/emailService.ts#L99-L112)
 - [phase-2 pulse service:179-188](file://phase-2/src/services/pulseService.ts#L179-L188)
+- [vercel.json:7-9](file://phase-3/vercel.json#L7-L9)
+- [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
 
 ## Runbooks
 
@@ -728,5 +839,20 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [phase-2 package.json:7-12](file://phase-2/package.json#L7-L12)
 - [phase-2 assignment.test.ts:1-110](file://phase-2/src/tests/assignment.test.ts#L1-L110)
 
+### Runbook: Deploy Frontend to Vercel
+- Steps
+  - Ensure root package.json build script executes successfully
+  - Push changes to connected GitHub repository
+  - Vercel automatically detects Vite framework and applies rewrite rules
+  - Monitor deployment status and preview URL
+  - Test client-side routing and API connectivity
+- Expected Outcome
+  - Frontend deployed with client-side routing support and API proxy configuration
+
+**Section sources**
+- [root package.json:5-8](file://package.json#L5-L8)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
+- [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
+
 ## Conclusion
-This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices. The recent optimization to a single-stage Docker build for Render deployment, enhanced dependency management, and improved health check configurations significantly improves deployment reliability and operational efficiency. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level provides better build context management and security. By implementing comprehensive testing frameworks, production-ready orchestration configurations, and robust containerization strategies, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.
+This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices and comprehensive frontend deployment support. The recent addition of Vercel deployment configuration for the React frontend in phase-3, combined with centralized build orchestration through the root package.json, significantly enhances the deployment flexibility and operational efficiency. The Vercel configuration with framework support, rewrite rules for client-side routing, and streamlined build process through cross-phase coordination provides a robust foundation for both backend and frontend deployment strategies. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level, along with the new Vercel deployment setup, creates a unified deployment architecture that supports both traditional containerized deployments and modern edge computing approaches. By implementing comprehensive testing frameworks, production-ready orchestration configurations, robust containerization strategies, and modern frontend deployment practices, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.

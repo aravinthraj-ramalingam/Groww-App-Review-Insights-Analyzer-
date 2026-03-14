@@ -2,8 +2,8 @@
 
 <cite>
 **Referenced Files in This Document**
-- [App.tsx](file://phase-3/src/App.tsx)
 - [main.tsx](file://phase-3/src/main.tsx)
+- [App.tsx](file://phase-3/src/App.tsx)
 - [api.ts](file://phase-3/src/services/api.ts)
 - [index.ts](file://phase-3/src/types/index.ts)
 - [Dashboard.tsx](file://phase-3/src/views/Dashboard.tsx)
@@ -17,7 +17,15 @@
 - [vercel.json](file://phase-3/vercel.json)
 - [tsconfig.json](file://phase-3/tsconfig.json)
 - [tsconfig.node.json](file://phase-3/tsconfig.node.json)
+- [root package.json](file://package.json)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated Build and Deployment Configuration section to reflect centralized build orchestration through root package.json
+- Added new section on Centralized Build Orchestration explaining the simplified development workflow
+- Updated troubleshooting guide to include centralized build command usage
+- Enhanced development workflow documentation with simplified build commands
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,16 +35,19 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [API Integration Layer](#api-integration-layer)
 7. [Styling and Theming](#styling-and-theming)
-8. [Build and Deployment Configuration](#build-and-deployment-configuration)
-9. [Performance Considerations](#performance-considerations)
-10. [Troubleshooting Guide](#troubleshooting-guide)
-11. [Conclusion](#conclusion)
+8. [Centralized Build Orchestration](#centralized-build-orchestration)
+9. [Build and Deployment Configuration](#build-and-deployment-configuration)
+10. [Performance Considerations](#performance-considerations)
+11. [Troubleshooting Guide](#troubleshooting-guide)
+12. [Conclusion](#conclusion)
 
 ## Introduction
 
 Phase 3 of the Groww App Review Insights Analyzer represents the frontend React application that serves as the user interface for analyzing public Google Play Store reviews. This application provides an internal tool for reviewing app feedback, generating insights, and managing automated email deliveries of weekly pulses. Built with modern React and TypeScript, the application offers a comprehensive dashboard for data exploration and actionable insights generation.
 
 The frontend application integrates seamlessly with the backend services developed in previous phases, providing a cohesive solution for automated review analysis and insights generation. The application follows React best practices with proper state management, component composition, and responsive design principles.
+
+**Updated** The application now benefits from centralized build orchestration through the root package.json, simplifying the development workflow and improving build process consistency across the entire project.
 
 ## Project Structure
 
@@ -69,6 +80,7 @@ Package[package.json]
 Vite[vite.config.ts]
 Vercel[vercel.json]
 TSConfig[tsconfig.json]
+RootPackage[root package.json]
 end
 Main --> App
 App --> Dashboard
@@ -94,6 +106,7 @@ Preferences --> CSS
 - [main.tsx:1-14](file://phase-3/src/main.tsx#L1-L14)
 - [App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 - [api.ts:1-63](file://phase-3/src/services/api.ts#L1-L63)
+- [root package.json:1-10](file://package.json#L1-L10)
 
 **Section sources**
 - [main.tsx:1-14](file://phase-3/src/main.tsx#L1-L14)
@@ -481,6 +494,60 @@ The application follows consistent styling patterns across all components:
 **Section sources**
 - [index.css:1-387](file://phase-3/src/index.css#L1-L387)
 
+## Centralized Build Orchestration
+
+**New Section** The project now implements centralized build orchestration through the root package.json, streamlining the development workflow and improving build process consistency across all phases.
+
+### Root Package Orchestration
+
+The root package.json provides unified build commands that coordinate between all project phases:
+
+```mermaid
+flowchart TD
+Start([Developer Command]) --> RootBuild[Root Build Command]
+RootBuild --> CDPhase3[Change Directory to phase-3]
+CDPhase3 --> InstallDeps[Install Dependencies]
+InstallDeps --> RunBuild[Execute Vite Build]
+RunBuild --> CopyDist[Copy dist to Root]
+CopyDist --> End([Build Complete])
+Start2([Developer Dev Command]) --> RootDev[Root Dev Command]
+RootDev --> CDPhase3Dev[Change Directory to phase-3]
+CDPhase3Dev --> RunDev[Execute Vite Dev Server]
+RunDev --> ProxySetup[Setup API Proxy]
+ProxySetup --> DevReady[Development Ready]
+DevReady --> End2([Dev Server Running])
+```
+
+**Diagram sources**
+- [root package.json:5-8](file://package.json#L5-L8)
+
+### Simplified Development Workflow
+
+The centralized approach provides two primary commands:
+
+**Build Command**:
+```bash
+npm run build
+```
+Executes the complete build process across all phases, automatically installing dependencies and copying build artifacts to the root distribution directory.
+
+**Development Command**:
+```bash
+npm run dev
+```
+Launches the development server for phase-3 with automatic proxy configuration to the backend API server.
+
+### Benefits of Centralized Build Orchestration
+
+- **Consistency**: Ensures all developers use the same build process
+- **Simplicity**: Reduces complexity by consolidating build logic
+- **Automation**: Handles dependency installation and artifact management automatically
+- **Cross-Phase Coordination**: Enables coordination between frontend and backend builds
+- **Reduced Maintenance**: Single source of truth for build commands
+
+**Section sources**
+- [root package.json:1-10](file://package.json#L1-L10)
+
 ## Build and Deployment Configuration
 
 The application utilizes Vite for fast development and optimized production builds, with comprehensive configuration for both development and deployment environments.
@@ -493,18 +560,18 @@ subgraph "Development Server"
 ViteDev[Vite Dev Server]
 Port3000[Port 3000]
 Proxy[API Proxy]
-end
+End
 subgraph "Build Process"
 TypeScript[TypeScript Compilation]
 ReactJSX[React JSX Transform]
 CSS[CSS Processing]
 Assets[Asset Optimization]
-end
+End
 subgraph "Environment"
 DevEnv[Development Environment]
 TestEnv[Test Environment]
 ProdEnv[Production Environment]
-end
+End
 ViteDev --> Port3000
 ViteDev --> Proxy
 ViteDev --> DevEnv
@@ -544,8 +611,8 @@ TestEnv --> ProdEnv
 
 **Section sources**
 - [vite.config.ts:1-20](file://phase-3/vite.config.ts#L1-L20)
-- [package.json:1-25](file://phase-3/package.json#L1-L25)
-- [vercel.json:1-23](file://phase-3/vercel.json#L1-L23)
+- [package.json:1-28](file://phase-3/package.json#L1-L28)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 ### TypeScript Configuration
 
@@ -625,6 +692,11 @@ Common issues and their solutions when working with the Phase 3 React applicatio
 - Clear browser cache and disable extensions temporarily
 - Verify file permissions for source directories
 
+**Centralized Build Issues**:
+- Verify root package.json build commands are accessible
+- Check that phase-3 directory exists and is properly configured
+- Ensure npm install completes successfully before build execution
+
 ### Runtime Issues
 
 **Component Rendering Problems**:
@@ -659,9 +731,15 @@ Common issues and their solutions when working with the Phase 3 React applicatio
 - Check backend service availability and response formats
 - Validate authentication and authorization mechanisms
 
+**Centralized Build Deployment Issues**:
+- Verify root build command executes successfully in CI/CD pipelines
+- Check that build artifacts are properly copied to expected locations
+- Ensure environment-specific configurations are correctly applied
+
 **Section sources**
 - [vite.config.ts:6-14](file://phase-3/vite.config.ts#L6-L14)
-- [vercel.json:13-18](file://phase-3/vercel.json#L13-L18)
+- [vercel.json:7-10](file://phase-3/vercel.json#L7-L10)
+- [root package.json:5-8](file://package.json#L5-L8)
 
 ## Conclusion
 
@@ -674,6 +752,12 @@ Key achievements include:
 - Comprehensive TypeScript implementation across all components
 - Well-structured API integration layer with typed interfaces
 - Responsive design system with consistent styling
+
+**Enhanced Development Workflow**:
+- Centralized build orchestration through root package.json
+- Simplified development commands with automatic dependency management
+- Streamlined cross-phase coordination for improved developer experience
+- Consistent build processes across all project phases
 
 **User Experience**:
 - Intuitive navigation with clear visual hierarchy
@@ -688,3 +772,5 @@ Key achievements include:
 - Comprehensive testing and validation strategies
 
 The application successfully bridges the gap between complex backend services and user-friendly interfaces, providing valuable insights from public Google Play Store reviews while maintaining data privacy and system reliability. The modular architecture ensures maintainability and extensibility for future enhancements.
+
+**Updated** The centralized build orchestration system significantly improves the development workflow by providing simplified commands, consistent build processes, and streamlined cross-phase coordination, making the entire development experience more efficient and reliable.
