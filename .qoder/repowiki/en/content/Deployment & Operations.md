@@ -15,9 +15,10 @@
 - [phase-2 pulse service](file://phase-2/src/services/pulseService.ts)
 - [phase-2 theme service](file://phase-2/src/services/themeService.ts)
 - [phase-2 user prefs repo](file://phase-2/src/services/userPrefsRepo.ts)
-- [phase-2 Dockerfile](file://phase-2/Dockerfile)
-- [phase-2 docker-compose.yml](file://phase-2/docker-compose.yml)
-- [phase-2 render.yaml](file://phase-2/render.yaml)
+- [Dockerfile](file://Dockerfile)
+- [docker-compose.yml](file://phase-2/docker-compose.yml)
+- [render.yaml](file://phase-2/render.yaml)
+- [.dockerignore](file://.dockerignore)
 - [phase-2 .dockerignore](file://phase-2/.dockerignore)
 - [phase-2 package.json](file://phase-2/package.json)
 - [phase-2 assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
@@ -31,9 +32,10 @@
 ## Update Summary
 **Changes Made**
 - Updated Docker build configuration from multi-stage to single-stage build optimized for Render deployment
+- Moved Dockerfile from phase-2/ to root directory for simplified containerization
 - Enhanced build dependencies installation and post-build cleanup process with npm prune --production
-- Updated .dockerignore exclusion patterns to include data/ directory and *.db files
-- Updated render.yaml repository URL to the new GitHub repository
+- Updated .dockerignore patterns at root level with comprehensive exclusion patterns
+- Updated render.yaml to reflect new Dockerfile location and context
 - Enhanced health check configuration in both Dockerfile and docker-compose.yml
 - Added comprehensive containerization documentation with single-stage build optimization
 
@@ -90,7 +92,7 @@ GROQ["Groq Client<br/>groqJson()"]
 TESTS["Testing Framework<br/>Node.js built-in test runner"]
 end
 subgraph "Containerization"
-DOCKER["Single-stage Docker Build<br/>Optimized for Render"]
+DOCKER["Single-stage Docker Build<br/>Root-level Dockerfile"]
 K8S["Kubernetes Deployment<br/>Render YAML"]
 COMPOSE["Docker Compose<br/>Local Development"]
 end
@@ -114,9 +116,9 @@ COMPOSE --> DOCKER
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
-- [phase-2 Dockerfile:1-38](file://phase-2/Dockerfile#L1-L38)
-- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
-- [phase-2 render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
+- [Dockerfile:1-42](file://Dockerfile#L1-L42)
+- [docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+- [render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
 
 **Section sources**
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
@@ -419,7 +421,7 @@ TESTS["Node.js Test Runner"] --> P2Server
 ## Containerization & Orchestration
 
 ### Single-Stage Docker Build (Optimized for Render)
-**Updated** The project now implements a streamlined single-stage Docker build optimized specifically for Render deployment, replacing the previous multi-stage build approach:
+**Updated** The project now implements a streamlined single-stage Docker build optimized specifically for Render deployment, with the Dockerfile moved to the root directory for simplified containerization:
 
 **Build Process**
 - Base Image: node:20-alpine with Python3, make, and g++ for better-sqlite3 compilation
@@ -427,15 +429,22 @@ TESTS["Node.js Test Runner"] --> P2Server
 - Post-build cleanup: Uses `npm prune --production` to remove devDependencies and reduce image size
 - Optimized layer caching with efficient build steps
 - Integrated health check for container monitoring
+- **Updated**: Now builds from root directory with COPY commands targeting phase-2/ directory
 
 **Production Configuration**
 - Environment variables: NODE_ENV=production, PORT=4002, DATABASE_FILE=/app/data/phase1.db
 - Health check via HTTP GET to /health endpoint with 30-second intervals
 - Data directory creation for SQLite persistence
-- Direct execution of compiled TypeScript output
+- Direct execution of compiled TypeScript output from dist/api/server.js
+
+**Root-level Dockerfile Benefits**
+- Simplified build context and reduced complexity
+- Better integration with Render's deployment pipeline
+- Consistent build process across development and production
+- Enhanced .dockerignore patterns at root level for comprehensive exclusion
 
 **Section sources**
-- [phase-2 Dockerfile:1-38](file://phase-2/Dockerfile#L1-L38)
+- [Dockerfile:1-42](file://Dockerfile#L1-L42)
 
 ### Docker Compose Configuration
 Local development environment with persistent storage and environment variable management:
@@ -452,7 +461,7 @@ Local development environment with persistent storage and environment variable m
 - Automatic volume creation and persistence across container restarts
 
 **Section sources**
-- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+- [docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
 
 ### Kubernetes Deployment (Render Platform)
 **Updated** Production-ready deployment configuration for Render's container platform with enhanced repository integration:
@@ -460,6 +469,8 @@ Local development environment with persistent storage and environment variable m
 **Platform Configuration**
 - Web service type with Docker runtime
 - Repository integration with GitHub: https://github.com/aravinthraj-ramalingam/Groww-App-Review-Insights-Analyzer-
+- **Updated**: DockerfilePath now points to ./Dockerfile in root directory
+- **Updated**: DockerContext now points to ./phase-2 for build context
 - Multi-service deployment with single container
 - Environment variable management with sync control
 - Persistent disk mounting for data persistence
@@ -471,7 +482,7 @@ Local development environment with persistent storage and environment variable m
 - Enhanced health check configuration
 
 **Section sources**
-- [phase-2 render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
+- [render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
 
 ### Container Security and Best Practices
 - Single-stage build reduces complexity while maintaining security
@@ -481,9 +492,11 @@ Local development environment with persistent storage and environment variable m
 - Environment variables for configuration
 - Health checks for container monitoring
 - Persistent volume for data durability
+- **Updated**: Enhanced .dockerignore patterns at root level for comprehensive exclusion
 
 **Section sources**
-- [phase-2 Dockerfile:18-38](file://phase-2/Dockerfile#L18-L38)
+- [Dockerfile:18-42](file://Dockerfile#L18-L42)
+- [.dockerignore:1-14](file://.dockerignore#L1-L14)
 - [phase-2 .dockerignore:1-12](file://phase-2/.dockerignore#L1-L12)
 
 ## Scaling & High Availability
@@ -517,6 +530,7 @@ Local development environment with persistent storage and environment variable m
   - Non-root user execution recommended
   - Minimal base images with security scanning
   - Environment variable management for secrets
+  - **Updated**: Enhanced .dockerignore patterns prevent accidental inclusion of sensitive files
 
 ## Backup & Recovery
 - Backups
@@ -698,8 +712,8 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Container running with healthy status; application accessible on port 4002
 
 **Section sources**
-- [phase-2 Dockerfile:1-38](file://phase-2/Dockerfile#L1-L38)
-- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+- [Dockerfile:1-42](file://Dockerfile#L1-L42)
+- [docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
 
 ### Runbook: Execute Test Suite
 - Steps
@@ -715,4 +729,4 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [phase-2 assignment.test.ts:1-110](file://phase-2/src/tests/assignment.test.ts#L1-L110)
 
 ## Conclusion
-This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices. The recent optimization to a single-stage Docker build for Render deployment, enhanced dependency management, and improved health check configurations significantly improves deployment reliability and operational efficiency. By implementing comprehensive testing frameworks, production-ready orchestration configurations, and robust containerization strategies, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.
+This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices. The recent optimization to a single-stage Docker build for Render deployment, enhanced dependency management, and improved health check configurations significantly improves deployment reliability and operational efficiency. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level provides better build context management and security. By implementing comprehensive testing frameworks, production-ready orchestration configurations, and robust containerization strategies, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.
