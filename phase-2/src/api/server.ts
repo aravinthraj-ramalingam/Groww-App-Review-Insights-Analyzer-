@@ -20,10 +20,16 @@ initSchema();
 const app = express();
 
 // Configure CORS for production
+const allowedOrigins = [
+  'https://groww-app-review-insights-analyzer.vercel.app',
+  'https://groww-app-review-insights-analyzer-m4q6espcq.vercel.app'
+];
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://groww-review-insights.vercel.app']
-    : '*',
+  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
   credentials: true
 };
 app.use(cors(corsOptions));
