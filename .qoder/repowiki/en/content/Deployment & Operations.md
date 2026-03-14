@@ -38,11 +38,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive Vercel deployment configuration for the React frontend in phase-3
-- Implemented centralized build orchestration through root package.json with cross-phase build coordination
-- Documented Vercel framework support with Vite configuration and client-side routing rewrite rules
-- Updated deployment architecture to include frontend deployment alongside backend containerization
-- Enhanced build process with streamlined multi-phase coordination for development and production
+- Enhanced Vercel deployment configuration with improved CORS setup supporting dynamic allowed origins
+- Standardized Node.js 20.x version across all phases using engines specification
+- Implemented Vercel permission fixes using npx --yes commands for frontend build processes
+- Updated CORS configuration to dynamically include FRONTEND_URL environment variable
+- Improved deployment architecture with consistent Node.js runtime versions
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -231,13 +231,17 @@ P2Server->>DB : update scheduled_jobs
   - GET /api/user-preferences: get active preferences.
   - POST /api/email/test: test SMTP configuration.
 
+**Updated** Enhanced CORS configuration with dynamic allowed origins for improved security and flexibility.
+
 Operational notes:
 - Validation and error handling are performed at the route level.
 - Logging is used for request lifecycle and errors.
+- CORS configuration now supports dynamic origins via FRONTEND_URL environment variable.
 
 **Section sources**
 - [phase-1 server:9-43](file://phase-1/src/api/server.ts#L9-L43)
 - [phase-2 server:28-232](file://phase-2/src/api/server.ts#L28-L232)
+- [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
 ### Persistence Model
 - Phase 1
@@ -370,11 +374,13 @@ Update --> Loop
   - DATABASE_FILE, PORT, GROQ_API_KEY, GROQ_MODEL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
 - Phase 3 (Frontend)
   - Vite configuration with React Router and proxy setup for API communication.
+  - **Updated**: Node.js 20.x engine specification for consistent runtime environment.
 
 **Section sources**
 - [phase-1 env:1-6](file://phase-1/src/config/env.ts#L1-L6)
 - [phase-2 env:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [phase-3 vite.config.ts:6-14](file://phase-3/vite.config.ts#L6-L14)
+- [phase-3 package.json:24-26](file://phase-3/package.json#L24-L26)
 
 ## Dependency Analysis
 - Runtime dependencies
@@ -542,7 +548,7 @@ Local development environment with persistent storage and environment variable m
 ## Frontend Deployment with Vercel
 
 ### Vercel Configuration for React Frontend
-**New** The project now includes comprehensive Vercel deployment configuration for the React frontend in phase-3:
+**Updated** The project now includes comprehensive Vercel deployment configuration for the React frontend in phase-3 with enhanced CORS support and standardized Node.js runtime:
 
 **Vercel Configuration Details**
 - Framework Support: Vite framework detection for optimized build process
@@ -550,6 +556,13 @@ Local development environment with persistent storage and environment variable m
 - Output Directory: dist folder containing compiled React application
 - Install Command: npm install for frontend dependencies
 - Rewrites: Client-side routing support with catch-all rewrite to index.html
+- **Updated**: Node.js 20.x runtime standardization across all phases
+
+**Enhanced CORS Configuration**
+The backend now supports dynamic CORS origins with improved security:
+- Static origins: groww-app-review-insights-analyzer.vercel.app and preview variants
+- Dynamic origin: FRONTEND_URL environment variable for custom domains
+- Production mode: strict origin validation; Development mode: wildcard '*'
 
 **Rewrite Rules for Client-Side Routing**
 The Vercel configuration includes rewrite rules that enable client-side routing for the React application:
@@ -584,6 +597,20 @@ The root package.json coordinates the build process across all phases:
 - [index.html:1-14](file://phase-3/index.html#L1-L14)
 - [App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 - [main.tsx:1-14](file://phase-3/src/main.tsx#L1-L14)
+- [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
+
+### Vercel Permission Fixes
+**New** Implementation of npx --yes commands for frontend build processes to address Vercel permission issues:
+
+**Build Process Improvements**
+- Development script: `"dev": "npx --yes vite"`
+- Build script: `"build": "npx --yes vite build"`
+- Preview script: `"preview": "npx --yes vite preview"`
+
+These npx --yes commands eliminate interactive prompts during Vercel builds, ensuring smooth CI/CD pipeline execution without manual intervention.
+
+**Section sources**
+- [phase-3 package.json:7-9](file://phase-3/package.json#L7-L9)
 
 ## Scaling & High Availability
 - Stateless API
@@ -625,11 +652,11 @@ The root package.json coordinates the build process across all phases:
   - Vercel's security features protect against common web vulnerabilities
   - HTTPS enforcement and security headers
   - Content Security Policy configuration
+  - **Updated**: Dynamic CORS configuration prevents unauthorized cross-origin requests
 
 ## Backup & Recovery
 - Backups
   - Snapshot the SQLite file; automate periodic backups to durable storage.
-  - For high availability, replicate the database to a standby.
 - Recovery
   - Validate backups; practice restoration drills.
   - Restore to a temporary environment before promoting to production.
@@ -740,6 +767,10 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Verify Vercel deployment status; check console for JavaScript errors.
   - Ensure API proxy configuration is working during development.
   - Validate client-side routing with rewrite rules.
+- **Updated** CORS Issues
+  - Verify FRONTEND_URL environment variable is set for dynamic origins.
+  - Check allowedOrigins array includes both static and dynamic entries.
+  - Ensure production mode uses strict origin validation.
 
 **Section sources**
 - [phase-2 server:22-22](file://phase-2/src/api/server.ts#L22-L22)
@@ -748,6 +779,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [phase-2 pulse service:179-188](file://phase-2/src/services/pulseService.ts#L179-L188)
 - [vercel.json:7-9](file://phase-3/vercel.json#L7-L9)
 - [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
+- [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
 ## Runbooks
 
@@ -846,6 +878,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Vercel automatically detects Vite framework and applies rewrite rules
   - Monitor deployment status and preview URL
   - Test client-side routing and API connectivity
+  - **Updated**: Verify CORS configuration with dynamic allowed origins
 - Expected Outcome
   - Frontend deployed with client-side routing support and API proxy configuration
 
@@ -853,6 +886,29 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [root package.json:5-8](file://package.json#L5-L8)
 - [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 - [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
+- [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
+
+### Runbook: Configure Dynamic CORS Origins
+- Steps
+  - Set FRONTEND_URL environment variable to your domain
+  - Verify allowedOrigins array includes both static and dynamic entries
+  - Test cross-origin requests from the configured domain
+  - Monitor CORS error logs for troubleshooting
+- Expected Outcome
+  - Dynamic origins properly validated; cross-origin requests succeed
+
+**Section sources**
+- [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
 ## Conclusion
-This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices and comprehensive frontend deployment support. The recent addition of Vercel deployment configuration for the React frontend in phase-3, combined with centralized build orchestration through the root package.json, significantly enhances the deployment flexibility and operational efficiency. The Vercel configuration with framework support, rewrite rules for client-side routing, and streamlined build process through cross-phase coordination provides a robust foundation for both backend and frontend deployment strategies. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level, along with the new Vercel deployment setup, creates a unified deployment architecture that supports both traditional containerized deployments and modern edge computing approaches. By implementing comprehensive testing frameworks, production-ready orchestration configurations, robust containerization strategies, and modern frontend deployment practices, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.
+This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices and comprehensive frontend deployment support. The recent enhancements significantly improve the deployment experience and operational efficiency:
+
+**Key Improvements:**
+- **Enhanced Vercel Deployment**: Improved CORS configuration with dynamic allowed origins for flexible domain management
+- **Node.js 20.x Standardization**: Consistent runtime environment across all phases using engines specification
+- **Vercel Permission Fixes**: Implementation of npx --yes commands eliminates build-time prompts and improves CI/CD reliability
+- **Centralized Build Orchestration**: Streamlined multi-phase build process through root package.json coordination
+
+The Vercel configuration with framework support, rewrite rules for client-side routing, and standardized Node.js runtime creates a robust foundation for both backend and frontend deployment strategies. The enhanced CORS setup with dynamic origins provides improved security while maintaining flexibility for custom domains. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level, combined with the new Vercel deployment setup, creates a unified deployment architecture that supports both traditional containerized deployments and modern edge computing approaches.
+
+By implementing comprehensive testing frameworks, production-ready orchestration configurations, robust containerization strategies, and modern frontend deployment practices with enhanced CORS security, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.

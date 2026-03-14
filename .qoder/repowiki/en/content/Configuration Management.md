@@ -16,7 +16,16 @@
 - [logger.ts](file://phase-2/src/core/logger.ts)
 - [logger.ts](file://phase-1/src/core/logger.ts)
 - [package.json](file://phase-2/package.json)
+- [package.json](file://phase-3/package.json)
+- [vercel.json](file://phase-3/vercel.json)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced CORS configuration with dynamic origin handling for production deployments
+- Added Node.js version specification in package.json files for consistent runtime environments
+- Integrated Vercel-specific environment configuration for frontend deployment
+- Updated deployment documentation to reflect modern frontend-backend separation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -31,10 +40,10 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-This document describes configuration management for the Groww App Review Insights Analyzer across phases. It covers environment variables, configuration loading patterns, defaults, validation, and security practices. It also documents database configuration for SQLite (development) and outlines how to adapt for PostgreSQL (production). Finally, it provides troubleshooting guidance and recommendations for configuration drift prevention and monitoring.
+This document describes configuration management for the Groww App Review Insights Analyzer across phases. It covers environment variables, configuration loading patterns, defaults, validation, and security practices. The system now includes enhanced CORS configuration with dynamic origin handling, Node.js version specification for consistent deployments, and Vercel-specific environment configuration for frontend hosting. It documents database configuration for SQLite (development) and outlines how to adapt for PostgreSQL (production). Finally, it provides troubleshooting guidance and recommendations for configuration drift prevention and monitoring.
 
 ## Project Structure
-Configuration is centralized in a dedicated module per phase and consumed by services, APIs, and jobs. Phase 1 focuses on a simple SQLite-backed setup and a basic HTTP server. Phase 2 introduces SMTP, Groq integration, scheduled jobs, and richer database schemas.
+Configuration is centralized in a dedicated module per phase and consumed by services, APIs, and jobs. Phase 1 focuses on a simple SQLite-backed setup and a basic HTTP server. Phase 2 introduces SMTP, Groq integration, scheduled jobs, and richer database schemas. Phase 3 handles frontend deployment with Vercel configuration and Node.js version specification.
 
 ```mermaid
 graph TB
@@ -53,6 +62,11 @@ P2_SCHED["jobs/schedulerJob.ts"]
 P2_PULSE["services/pulseService.ts"]
 P2_THEME["services/themeService.ts"]
 end
+subgraph "Phase 3"
+P3_PKG["package.json (Node.js 20.x)"]
+P3_VERCEL["vercel.json (Vercel Config)"]
+P3_CORS["Enhanced CORS Config"]
+end
 P1_ENV --> P1_DB
 P1_ENV --> P1_SRV
 P2_ENV --> P2_DB
@@ -62,6 +76,8 @@ P2_ENV --> P2_EMAIL
 P2_ENV --> P2_SCHED
 P2_GROQ --> P2_PULSE
 P2_GROQ --> P2_THEME
+P3_PKG --> P3_VERCEL
+P3_PKG --> P3_CORS
 ```
 
 **Diagram sources**
@@ -76,6 +92,8 @@ P2_GROQ --> P2_THEME
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [pulseService.ts:1-200](file://phase-2/src/services/pulseService.ts#L1-L200)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 **Section sources**
 - [env.ts:1-6](file://phase-1/src/config/env.ts#L1-L6)
@@ -84,6 +102,8 @@ P2_GROQ --> P2_THEME
 - [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
 - [server.ts:1-50](file://phase-1/src/api/server.ts#L1-L50)
 - [server.ts:1-266](file://phase-2/src/api/server.ts#L1-L266)
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 ## Core Components
 - Environment configuration loader: Loads environment variables and applies defaults.
@@ -92,6 +112,7 @@ P2_GROQ --> P2_THEME
 - Groq client: Optional; enabled only when API key is present.
 - Email service: Requires SMTP credentials; validates presence at runtime.
 - Scheduler: Starts automatically when Groq API key is present.
+- **Enhanced CORS configuration**: Dynamic origin handling for production deployments with Vercel-hosted frontend support.
 
 Key configuration surfaces:
 - DATABASE_FILE: Path to SQLite database file.
@@ -99,6 +120,8 @@ Key configuration surfaces:
 - GROQ_API_KEY: Enables Groq-powered features and scheduler.
 - GROQ_MODEL: Model identifier for Groq requests.
 - SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM: Email delivery configuration.
+- **FRONTEND_URL**: Dynamic frontend origin for CORS configuration.
+- **NODE_ENV**: Environment detection for production vs development CORS settings.
 
 **Section sources**
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
@@ -107,9 +130,10 @@ Key configuration surfaces:
 - [groqClient.ts:4-7](file://phase-2/src/services/groqClient.ts#L4-L7)
 - [emailService.ts:99-112](file://phase-2/src/services/emailService.ts#L99-L112)
 - [schedulerJob.ts:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
+- [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
 ## Architecture Overview
-Configuration flows from environment to services and infrastructure components. The Phase 2 environment loader also loads secrets from a project-local dotenv file, enabling local development without leaking secrets into the repository.
+Configuration flows from environment to services and infrastructure components. The Phase 2 environment loader also loads secrets from a project-local dotenv file, enabling local development without leaking secrets into the repository. The enhanced CORS configuration now supports dynamic origins for Vercel-hosted frontend deployments.
 
 ```mermaid
 sequenceDiagram
@@ -127,6 +151,7 @@ Cfg-->>API : Provide PORT
 Cfg-->>Groq : Provide GROQ_API_KEY and GROQ_MODEL
 Cfg-->>Email : Provide SMTP_* and SMTP_FROM
 API->>DB : Initialize SQLite connection
+API->>API : Configure enhanced CORS with dynamic origins
 API->>Groq : Conditionally start scheduler
 API->>Email : Validate SMTP presence for send operations
 ```
@@ -159,6 +184,48 @@ Security:
 - [env.ts:1-6](file://phase-1/src/config/env.ts#L1-L6)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [server.ts:254-263](file://phase-2/src/api/server.ts#L254-L263)
+
+### Enhanced CORS Configuration
+**Updated** The CORS configuration now includes dynamic origin handling for production deployments:
+
+- **Production Mode**: Uses predefined allowed origins plus any FRONTEND_URL environment variable
+- **Development Mode**: Allows all origins (`*`) for local development
+- **Credentials Support**: Enabled for authenticated requests
+- **Vercel Integration**: Predefined origins for Vercel-hosted frontend deployments
+
+Configuration details:
+- Allowed origins include production Vercel domains and any custom FRONTEND_URL
+- Dynamic addition of FRONTEND_URL environment variable for custom deployments
+- Conditional application based on NODE_ENV environment variable
+- Credentials support enabled for session-based authentication
+
+**Section sources**
+- [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
+
+### Node.js Version Specification
+**Updated** Both phase-2 and phase-3 package.json files now specify Node.js version requirements:
+
+- **Phase 2**: Standard Node.js version specification
+- **Phase 3**: Explicit Node.js 20.x specification for Vercel deployment compatibility
+- Ensures consistent runtime environments across development and production
+- Prevents Node.js version conflicts during deployment
+
+**Section sources**
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [package.json:1-32](file://phase-2/package.json#L1-L32)
+
+### Vercel-Specific Environment Configuration
+**New** Phase 3 introduces comprehensive Vercel configuration:
+
+- **Framework Detection**: Automatically detects Vite framework for React applications
+- **Build Commands**: Custom build command configuration for Vite-based React app
+- **Output Directory**: Specifies dist folder as build output
+- **Install Commands**: Custom npm install command for Vercel deployment
+- **Rewrite Rules**: Single-page application routing with index.html fallback
+- **Version Control**: Vercel configuration file included in version control
+
+**Section sources**
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 ### Database Configuration
 - SQLite (development):
@@ -198,15 +265,18 @@ InitSchema --> Ready(["DB Ready"])
 - Reads port from configuration and logs it at startup.
 - Initializes database schema on startup.
 - Conditionally starts the scheduler if Groq API key is present.
+- **Enhanced CORS configuration** with dynamic origin handling.
 
 Operational notes:
 - Port is configurable to avoid conflicts during local development.
 - Schema initialization occurs once per process start.
+- CORS configuration adapts to environment (development vs production).
 
 **Section sources**
 - [server.ts:45-48](file://phase-1/src/api/server.ts#L45-L48)
-- [server.ts](file://phase-2/src/api/server.ts#L16)
+- [server.ts:16](file://phase-2/src/api/server.ts#L16)
 - [server.ts:254-263](file://phase-2/src/api/server.ts#L254-L263)
+- [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
 ### Groq Client Configuration
 - Enabled only when GROQ_API_KEY is set.
@@ -249,7 +319,7 @@ Operational notes:
 **Section sources**
 - [server.ts:257-262](file://phase-2/src/api/server.ts#L257-L262)
 - [schedulerJob.ts:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
-- [env.ts](file://phase-2/src/config/env.ts#L13)
+- [env.ts:13](file://phase-2/src/config/env.ts#L13)
 
 ### Theme and Pulse Generation
 - Groq-based theme generation requires GROQ_API_KEY.
@@ -279,6 +349,8 @@ GROQ --> THEME["services/themeService.ts"]
 SRV --> LOG["core/logger.ts"]
 DBIDX --> LOG
 EMAIL --> LOG
+PKG["package.json (Node.js 20.x)"] --> VERCEL["vercel.json"]
+PKG --> CORS["Enhanced CORS Config"]
 ```
 
 **Diagram sources**
@@ -291,6 +363,8 @@ EMAIL --> LOG
 - [pulseService.ts:1-200](file://phase-2/src/services/pulseService.ts#L1-L200)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 **Section sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
@@ -302,11 +376,15 @@ EMAIL --> LOG
 - [pulseService.ts:1-200](file://phase-2/src/services/pulseService.ts#L1-L200)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 ## Performance Considerations
 - Environment loading is synchronous and happens at process start; keep the number of environment reads minimal.
 - SQLite is suitable for development and small-scale production; consider connection pooling and indexing strategies for PostgreSQL.
 - Email and Groq calls are externalized; tune retry delays and concurrency carefully to avoid rate limits.
+- **Enhanced CORS** adds minimal overhead but improves security and reduces preflight requests in production.
+- **Node.js version specification** ensures optimal performance and compatibility across environments.
 
 ## Troubleshooting Guide
 Common configuration issues and resolutions:
@@ -323,15 +401,30 @@ Common configuration issues and resolutions:
 - Incorrect database file path:
   - Symptom: Schema initialization fails or database not found.
   - Resolution: Verify DATABASE_FILE; ensure the path exists and is writable.
-  - Reference: [env.ts:9-10](file://phase-2/src/config/env.ts#L9-L10), [index.ts](file://phase-2/src/db/index.ts#L5)
+  - Reference: [env.ts:9-10](file://phase-2/src/config/env.ts#L9-L10), [index.ts:5](file://phase-2/src/db/index.ts#L5)
 
 - Port conflicts:
   - Symptom: Server fails to bind to the configured port.
   - Resolution: Change PORT environment variable.
-  - Reference: [env.ts](file://phase-2/src/config/env.ts#L11), [server.ts:254-256](file://phase-2/src/api/server.ts#L254-L256)
+  - Reference: [env.ts:11](file://phase-2/src/config/env.ts#L11), [server.ts:254-256](file://phase-2/src/api/server.ts#L254-L256)
+
+- **CORS Configuration Issues**:
+  - Symptom: Frontend requests blocked in production; "blocked by CORS policy" errors.
+  - Resolution: Set FRONTEND_URL environment variable to match your deployed frontend origin.
+  - Reference: [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
+
+- **Node.js Version Conflicts**:
+  - Symptom: Build failures or runtime errors on Vercel deployment.
+  - Resolution: Ensure Node.js version matches package.json engines specification.
+  - Reference: [package.json:24-26](file://phase-3/package.json#L24-L26)
+
+- **Vercel Deployment Issues**:
+  - Symptom: Frontend not served correctly or build failures.
+  - Resolution: Verify vercel.json configuration and build commands.
+  - Reference: [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 - No themes available:
-  - Symptom: Pulse generation fails with a “no themes” error.
+  - Symptom: Pulse generation fails with a "no themes" error.
   - Resolution: Generate themes first via the themes route.
   - Reference: [pulseService.ts:180-183](file://phase-2/src/services/pulseService.ts#L180-L183)
 
@@ -341,7 +434,7 @@ Common configuration issues and resolutions:
   - Reference: [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21), [logger.ts:1-23](file://phase-1/src/core/logger.ts#L1-L23)
 
 ## Conclusion
-Configuration in this project is intentionally minimal and explicit. Phase 2 centralizes environment variables, loads secrets from a dotenv file, and gates sensitive features behind optional credentials. SQLite is used for development, with clear pathways to migrate to PostgreSQL. Robust validation and logging help maintain reliability and observability.
+Configuration in this project is intentionally minimal and explicit. Phase 2 centralizes environment variables, loads secrets from a dotenv file, and gates sensitive features behind optional credentials. The enhanced CORS configuration now supports dynamic origins for production deployments, while Node.js version specification ensures consistent runtime environments. Vercel-specific configuration enables seamless frontend deployment. SQLite is used for development, with clear pathways to migrate to PostgreSQL. Robust validation and logging help maintain reliability and observability.
 
 ## Appendices
 
@@ -355,6 +448,8 @@ Configuration in this project is intentionally minimal and explicit. Phase 2 cen
 - SMTP_USER: SMTP username.
 - SMTP_PASS: SMTP password.
 - SMTP_FROM: Sender email address; falls back to SMTP_USER if not set.
+- **FRONTEND_URL**: Dynamic frontend origin for CORS configuration in production.
+- **NODE_ENV**: Environment detection for production vs development CORS settings.
 
 **Section sources**
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
@@ -363,32 +458,45 @@ Configuration in this project is intentionally minimal and explicit. Phase 2 cen
 - Local development:
   - Use dotenv to load secrets from the repository root.
   - SQLite database file path is configurable.
+  - CORS allows all origins for development flexibility.
 - Production:
   - Prefer environment injection over dotenv.
   - Consider PostgreSQL with a connection string.
   - Enable health checks and monitoring around configuration loading.
+  - **Enhanced CORS** with dynamic origin handling for production deployments.
+  - **Node.js 20.x** specification for consistent runtime environments.
+  - **Vercel configuration** for frontend deployment with proper routing.
 
 **Section sources**
 - [env.ts:4-5](file://phase-2/src/config/env.ts#L4-L5)
 - [package.json:7-11](file://phase-2/package.json#L7-L11)
+- [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
+- [package.json:24-26](file://phase-3/package.json#L24-L26)
+- [vercel.json:1-11](file://phase-3/vercel.json#L1-L11)
 
 ### Security Best Practices
 - Never commit secrets to version control; use environment injection or secret managers.
 - Restrict SMTP_FROM to verified sender domains.
 - Rotate API keys regularly and monitor usage.
 - Sanitize outputs and logs to avoid leaking sensitive data.
+- **Enhanced CORS** configuration prevents unauthorized cross-origin requests in production.
+- **Node.js version specification** ensures consistent security patches across environments.
 
 ### Configuration Drift Prevention
 - Pin dependency versions and lockfiles.
 - Use a centralized configuration loader and avoid ad-hoc environment reads.
 - Document environment variables and their defaults in a shared spec.
 - Add pre-deploy validation to verify required variables are set.
+- **Implement CORS origin validation** to prevent configuration drift in production.
 
 ### Monitoring Configuration Changes
 - Log configuration values at startup for auditability.
 - Track configuration-related errors and retries.
 - Integrate with health endpoints to surface configuration status.
+- **Monitor CORS configuration** for unexpected origin violations in production.
+- **Track Node.js version compliance** across different deployment environments.
 
 **Section sources**
 - [server.ts:254-256](file://phase-2/src/api/server.ts#L254-L256)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [server.ts:22-35](file://phase-2/src/api/server.ts#L22-L35)
