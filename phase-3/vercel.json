@@ -15,8 +15,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_API_URL": "@groww_api_url"
-  }
+  ]
 }
