@@ -45,9 +45,23 @@ app.get('/health', (_req: Request, res: Response) => res.json({ ok: true }));
 /** GET /api/reviews/stats — get dashboard statistics */
 app.get('/api/reviews/stats', (_req: Request, res: Response) => {
   try {
-    const totalReviews = (db.prepare('SELECT COUNT(*) as count FROM reviews').get() as any).count;
-    const totalThemes = (db.prepare('SELECT COUNT(*) as count FROM themes').get() as any).count;
-    const weeksCovered = (db.prepare('SELECT COUNT(DISTINCT week_start) as count FROM reviews').get() as any).count;
+    // Check if reviews table exists and has data
+    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='reviews'").get();
+    if (!tableCheck) {
+      return res.json({
+        ok: true,
+        stats: {
+          totalReviews: 0,
+          totalThemes: 0,
+          weeksCovered: 0,
+          lastPulseDate: null
+        }
+      });
+    }
+    
+    const totalReviews = (db.prepare('SELECT COUNT(*) as count FROM reviews').get() as any)?.count || 0;
+    const totalThemes = (db.prepare('SELECT COUNT(*) as count FROM themes').get() as any)?.count || 0;
+    const weeksCovered = (db.prepare('SELECT COUNT(DISTINCT week_start) as count FROM reviews').get() as any)?.count || 0;
     const lastPulse = db.prepare('SELECT week_start FROM weekly_pulses ORDER BY created_at DESC LIMIT 1').get() as any;
     
     res.json({
