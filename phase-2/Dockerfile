@@ -1,19 +1,17 @@
 # Multi-stage build for production
-# Use phase-2 as the build context
+# Build for Render deployment
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies for better-sqlite3
+# Install build dependencies for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
-# Copy package files first for better caching
-COPY package*.json ./
-RUN npm ci
+# Copy all source files (excluding files in .dockerignore)
+COPY . .
 
-# Copy source code
-COPY tsconfig.json ./
-COPY src ./src
+# Install dependencies
+RUN npm ci
 
 # Build TypeScript
 RUN npm run build
@@ -23,7 +21,7 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Install dependencies for better-sqlite3
+# Install runtime dependencies for better-sqlite3
 RUN apk add --no-cache python3 make g++
 
 # Copy package files

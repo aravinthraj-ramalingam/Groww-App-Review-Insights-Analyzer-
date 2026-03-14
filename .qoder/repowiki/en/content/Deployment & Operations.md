@@ -15,9 +15,27 @@
 - [phase-2 pulse service](file://phase-2/src/services/pulseService.ts)
 - [phase-2 theme service](file://phase-2/src/services/themeService.ts)
 - [phase-2 user prefs repo](file://phase-2/src/services/userPrefsRepo.ts)
-- [phase-1 package.json](file://phase-1/package.json)
+- [phase-2 Dockerfile](file://phase-2/Dockerfile)
+- [phase-2 docker-compose.yml](file://phase-2/docker-compose.yml)
+- [phase-2 render.yaml](file://phase-2/render.yaml)
+- [phase-2 .dockerignore](file://phase-2/.dockerignore)
 - [phase-2 package.json](file://phase-2/package.json)
+- [phase-2 assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
+- [phase-2 email.test.ts](file://phase-2/src/tests/email.test.ts)
+- [phase-2 pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
+- [phase-2 scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
+- [phase-2 schema.test.ts](file://phase-2/src/tests/schema.test.ts)
+- [phase-2 userPrefs.test.ts](file://phase-2/src/tests/userPrefs.test.ts)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added comprehensive containerization documentation with Docker multi-stage builds
+- Documented Kubernetes deployment configuration via Render YAML
+- Added detailed testing framework documentation with Node.js built-in test runner
+- Updated environment setup to include Docker Compose configuration
+- Enhanced security and compliance section with container-specific considerations
+- Added new operational procedures for containerized deployments
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,18 +53,19 @@
 13. [Backup & Recovery](#backup--recovery)
 14. [Disaster Recovery Planning](#disaster-recovery-planning)
 15. [Maintenance & Scheduling](#maintenance--scheduling)
-16. [Troubleshooting Guide](#troubleshooting-guide)
-17. [Runbooks](#runbooks)
-18. [Conclusion](#conclusion)
+16. [Testing Framework](#testing-framework)
+17. [Troubleshooting Guide](#troubleshooting-guide)
+18. [Runbooks](#runbooks)
+19. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides comprehensive deployment and operations guidance for the Groww App Review Insights Analyzer. It covers environment setup across development, staging, and production, containerization and orchestration strategies, monitoring and logging, backup and recovery, scaling and high availability, security and compliance, and operational runbooks for troubleshooting and maintenance.
+This document provides comprehensive deployment and operations guidance for the Groww App Review Insights Analyzer. It covers environment setup across development, staging, and production, containerization and orchestration strategies, monitoring and logging, backup and recovery, scaling and high availability, security and compliance, testing frameworks, and operational runbooks for troubleshooting and maintenance.
 
 ## Project Structure
 The repository is split into three phases:
 - Phase 1: Core scraping, filtering, and SQLite storage with a small HTTP API.
 - Phase 2: Enhanced with theming, weekly pulse generation, scheduled email delivery, and persistence of user preferences and scheduled jobs.
-- Phase 3: Contains a README with architectural notes.
+- Phase 3: Frontend dashboard application.
 
 Key runtime components:
 - HTTP servers for each phase
@@ -54,6 +73,7 @@ Key runtime components:
 - Scheduler for automated pulse generation and email delivery
 - Email transport via SMTP
 - Structured logging
+- Comprehensive testing framework using Node.js built-in test runner
 
 ```mermaid
 graph TB
@@ -67,6 +87,12 @@ P2DB["SQLite DB<br/>themes, review_themes, weekly_pulses, user_preferences, sche
 SCH["Scheduler Job<br/>runSchedulerOnce()"]
 EMAIL["Email Service<br/>sendPulseEmail(), sendTestEmail()"]
 GROQ["Groq Client<br/>groqJson()"]
+TESTS["Testing Framework<br/>Node.js built-in test runner"]
+end
+subgraph "Containerization"
+DOCKER["Docker Multi-stage Build<br/>Production Image"]
+K8S["Kubernetes Deployment<br/>Render YAML"]
+COMPOSE["Docker Compose<br/>Local Development"]
 end
 P1S --> P1DB
 P2S --> P2DB
@@ -74,6 +100,10 @@ SCH --> P2S
 SCH --> EMAIL
 P2S --> GROQ
 P2S --> P2DB
+P2S --> TESTS
+DOCKER --> P2S
+K8S --> DOCKER
+COMPOSE --> DOCKER
 ```
 
 **Diagram sources**
@@ -84,6 +114,9 @@ P2S --> P2DB
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [phase-2 Dockerfile:1-53](file://phase-2/Dockerfile#L1-L53)
+- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+- [phase-2 render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
 
 **Section sources**
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
@@ -106,6 +139,8 @@ P2S --> P2DB
   - Groq client with retries and JSON extraction for structured outputs.
 - Logging
   - Console-based logging with INFO/ERROR helpers.
+- Testing Framework
+  - Comprehensive test suite using Node.js built-in test runner with isolated test files for different components.
 
 **Section sources**
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
@@ -119,7 +154,7 @@ P2S --> P2DB
 - [phase-2 logger:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 
 ## Architecture Overview
-The system comprises two primary runtime phases:
+The system comprises two primary runtime phases with containerized deployment capabilities:
 - Phase 1: Standalone API for scraping and storing reviews into SQLite.
 - Phase 2: Full-featured API with theming, pulse generation, scheduled emails, and persistence.
 
@@ -322,6 +357,7 @@ Update --> Loop
   - zod for schema validation.
 - Build/test/dev dependencies
   - TypeScript, ts-node, @types packages.
+  - Node.js built-in test runner for comprehensive testing.
 
 ```mermaid
 graph LR
@@ -333,6 +369,7 @@ P2Server --> Zod["zod"]
 P1Server["phase-1 server"] --> Express
 P1Server --> DB
 P1Server --> GPS["google-play-scraper"]
+TESTS["Node.js Test Runner"] --> P2Server
 ```
 
 **Diagram sources**
@@ -354,8 +391,6 @@ P1Server --> GPS["google-play-scraper"]
 - Caching
   - Consider caching recent themes and pulses if read-heavy.
 
-[No sources needed since this section provides general guidance]
-
 ## Monitoring & Logging
 - Logging
   - Console-based INFO/ERROR logs are used across components.
@@ -367,8 +402,6 @@ P1Server --> GPS["google-play-scraper"]
   - Alert on failed scheduled jobs, repeated errors, and health check failures.
 - Centralized Logging
   - Ship logs to a log aggregator (e.g., ELK, Loki) with correlation IDs.
-
-[No sources needed since this section provides general guidance]
 
 ## Environment Setup
 - Development
@@ -383,22 +416,71 @@ P1Server --> GPS["google-play-scraper"]
   - Enforce secrets management and network policies.
   - Configure health checks and readiness probes.
 
-[No sources needed since this section provides general guidance]
-
 ## Containerization & Orchestration
-- Images
-  - Multi-stage builds: compile TypeScript, copy runtime deps, install production deps only.
-  - Use a non-root user and lock down filesystem permissions.
-- Volumes
-  - Mount persistent volume for the SQLite file if running multiple replicas; otherwise, prefer a shared storage backend.
-- Orchestration
-  - Kubernetes: Deploy separate workloads for Phase 1 and Phase 2; expose HTTP services; manage secrets and configmaps.
-  - Horizontal Pod Autoscaling based on CPU/memory or custom metrics.
-  - Rolling updates with readiness/liveness probes.
-- Networking
-  - Ingress/Route with TLS termination; restrict egress to external APIs (Play Store, Groq, SMTP).
 
-[No sources needed since this section provides general guidance]
+### Docker Multi-stage Build
+The project implements a comprehensive Docker containerization strategy with multi-stage builds optimized for production deployment:
+
+**Build Process**
+- Stage 1 (Builder): Uses node:20-alpine with Python3, make, and g++ for better-sqlite3 compilation
+- Stage 2 (Production): Minimal production image with only runtime dependencies
+- Optimized layer caching with package.json copying before source code
+- Health check integration for container monitoring
+
+**Production Configuration**
+- Non-root user execution (recommended)
+- Environment variables: NODE_ENV=production, PORT=4002, DATABASE_FILE=/app/data/phase1.db
+- Health check via HTTP GET to /health endpoint
+- Data directory creation for SQLite persistence
+
+**Section sources**
+- [phase-2 Dockerfile:1-53](file://phase-2/Dockerfile#L1-L53)
+
+### Docker Compose Configuration
+Local development environment with persistent storage and environment variable management:
+
+**Service Configuration**
+- Backend service with port mapping 4002:4002
+- Persistent volume mounting for SQLite data
+- Environment variable injection from .env file
+- Health check integration with 30-second intervals
+
+**Volume Management**
+- Named volume "data" mounted to /app/data
+- Automatic volume creation and persistence across container restarts
+
+**Section sources**
+- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+
+### Kubernetes Deployment (Render Platform)
+Production-ready deployment configuration for Render's container platform:
+
+**Platform Configuration**
+- Web service type with Docker runtime
+- Repository integration with GitHub
+- Multi-service deployment with single container
+- Environment variable management with sync control
+- Persistent disk mounting for data persistence
+
+**Resource Management**
+- Disk allocation: 1GB persistent volume
+- Mount path: /app/data for SQLite database
+- Automatic restart policy: unless-stopped
+
+**Section sources**
+- [phase-2 render.yaml:1-33](file://phase-2/render.yaml#L1-L33)
+
+### Container Security and Best Practices
+- Multi-stage build reduces attack surface
+- Non-root user execution recommended
+- Minimal base image (alpine linux)
+- Environment variables for configuration
+- Health checks for container monitoring
+- Persistent volume for data durability
+
+**Section sources**
+- [phase-2 Dockerfile:21-53](file://phase-2/Dockerfile#L21-L53)
+- [phase-2 .dockerignore:1-13](file://phase-2/.dockerignore#L1-L13)
 
 ## Scaling & High Availability
 - Stateless API
@@ -409,8 +491,10 @@ P1Server --> GPS["google-play-scraper"]
   - For write-heavy workloads, consider a clustered database or migration to a managed RDBMS.
 - Queue-Based Delivery
   - Offload email sending to a queue/job system for decoupling and reliability.
-
-[No sources needed since this section provides general guidance]
+- Container Scaling
+  - Horizontal pod autoscaling based on CPU/memory or custom metrics
+  - Rolling updates with readiness/liveness probes
+  - Persistent volume claims for stateful containers
 
 ## Security & Compliance
 - Secrets Management
@@ -424,8 +508,11 @@ P1Server --> GPS["google-play-scraper"]
   - Scan container images and dependencies; patch regularly.
 - Compliance
   - Align logging retention and data deletion with policy; audit access to secrets.
-
-[No sources needed since this section provides general guidance]
+- Container Security
+  - Multi-stage builds reduce attack surface
+  - Non-root user execution recommended
+  - Minimal base images with security scanning
+  - Environment variable management for secrets
 
 ## Backup & Recovery
 - Backups
@@ -436,8 +523,9 @@ P1Server --> GPS["google-play-scraper"]
   - Restore to a temporary environment before promoting to production.
 - Retention
   - Define retention periods for logs and backups per policy.
-
-[No sources needed since this section provides general guidance]
+- Container Data Persistence
+  - Persistent volume snapshots for containerized deployments
+  - Volume backup strategies for stateful applications
 
 ## Disaster Recovery Planning
 - RTO/RPO Targets
@@ -446,8 +534,10 @@ P1Server --> GPS["google-play-scraper"]
   - Automated failover to secondary region; switch DNS or ingress.
 - Testing
   - Regular DR tests; include cross-region restore scenarios.
-
-[No sources needed since this section provides general guidance]
+- Containerized DR
+  - Multi-region container deployments
+  - Volume replication for persistent data
+  - Automated failover mechanisms
 
 ## Maintenance & Scheduling
 - Routine Tasks
@@ -456,8 +546,57 @@ P1Server --> GPS["google-play-scraper"]
   - Rotate secrets periodically; rotate Groq and SMTP credentials.
 - Capacity Planning
   - Monitor growth in reviews and pulses; plan storage and compute increases.
+- Container Maintenance
+  - Regular container image updates and security patches
+  - Volume cleanup and optimization
+  - Log rotation and cleanup policies
 
-[No sources needed since this section provides general guidance]
+## Testing Framework
+
+### Node.js Built-in Test Runner
+The project implements a comprehensive testing framework using Node.js built-in test runner with isolated test files for different components:
+
+**Test Categories**
+- Assignment Logic: Review-to-theme assignment with confidence scoring
+- Email Generation: HTML and text email body construction with PII handling
+- Pulse Generation: Weekly pulse object validation and word count enforcement
+- Scheduler Logic: Due date calculation and email dispatch simulation
+- User Preferences: CRUD operations with active preference management
+- Schema Validation: Zod schema validation testing
+
+**Test Architecture**
+- Each component has its own test file for focused testing
+- In-memory SQLite databases for isolated test environments
+- Stubbing and mocking for external dependencies (Groq API, email services)
+- Comprehensive assertion coverage for business logic validation
+
+**Test Execution**
+- Built-in Node.js test runner (`node --test`)
+- TypeScript compilation before test execution
+- Isolated test environments preventing cross-test contamination
+
+**Section sources**
+- [phase-2 assignment.test.ts:1-110](file://phase-2/src/tests/assignment.test.ts#L1-L110)
+- [phase-2 email.test.ts:1-100](file://phase-2/src/tests/email.test.ts#L1-L100)
+- [phase-2 pulse.test.ts:1-97](file://phase-2/src/tests/pulse.test.ts#L1-L97)
+- [phase-2 scheduler.test.ts:1-133](file://phase-2/src/tests/scheduler.test.ts#L1-L133)
+- [phase-2 userPrefs.test.ts:1-99](file://phase-2/src/tests/userPrefs.test.ts#L1-L99)
+- [phase-2 schema.test.ts:1-10](file://phase-2/src/tests/schema.test.ts#L1-L10)
+
+### Test Coverage Areas
+- **Assignment Logic**: Validates review-to-theme assignment with confidence scoring and database persistence
+- **Email Generation**: Ensures proper HTML/text email construction, PII handling, and content validation
+- **Pulse Generation**: Verifies weekly pulse object structure, word count limits, and data integrity
+- **Scheduler Logic**: Tests due date calculation, timezone handling, and email dispatch workflows
+- **User Preferences**: Confirms CRUD operations, active preference management, and data validation
+- **Schema Validation**: Validates Zod schema parsing and type safety
+
+**Section sources**
+- [phase-2 assignment.test.ts:57-92](file://phase-2/src/tests/assignment.test.ts#L57-L92)
+- [phase-2 email.test.ts:38-72](file://phase-2/src/tests/email.test.ts#L38-L72)
+- [phase-2 pulse.test.ts:17-45](file://phase-2/src/tests/pulse.test.ts#L17-L45)
+- [phase-2 scheduler.test.ts:36-65](file://phase-2/src/tests/scheduler.test.ts#L36-L65)
+- [phase-2 userPrefs.test.ts:50-78](file://phase-2/src/tests/userPrefs.test.ts#L50-L78)
 
 ## Troubleshooting Guide
 - Health Checks
@@ -470,6 +609,10 @@ P1Server --> GPS["google-play-scraper"]
   - Validate SMTP credentials; test with /api/email/test; inspect scheduled_jobs statuses.
 - LLM Errors
   - Inspect Groq API key and model; review retry logs.
+- Container Issues
+  - Check Docker health checks; verify environment variables; inspect container logs.
+- Testing Failures
+  - Run individual test suites; check in-memory database initialization; validate stub implementations.
 
 **Section sources**
 - [phase-2 server:22-22](file://phase-2/src/api/server.ts#L22-L22)
@@ -541,5 +684,31 @@ P1Server --> GPS["google-play-scraper"]
 - [phase-1 db:7-29](file://phase-1/src/db/index.ts#L7-L29)
 - [phase-2 db:7-91](file://phase-2/src/db/index.ts#L7-L91)
 
+### Runbook: Containerized Deployment
+- Steps
+  - Build Docker image: `docker build -t groww-insights:latest .`
+  - Run with Docker Compose: `docker-compose up -d`
+  - Verify health check: `curl http://localhost:4002/health`
+  - Check container logs: `docker-compose logs backend`
+- Expected Outcome
+  - Container running with healthy status; application accessible on port 4002
+
+**Section sources**
+- [phase-2 Dockerfile:1-53](file://phase-2/Dockerfile#L1-L53)
+- [phase-2 docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
+
+### Runbook: Execute Test Suite
+- Steps
+  - Build the project: `npm run build`
+  - Run all tests: `npm test`
+  - Run specific test file: `node --test dist/tests/assignment.test.js`
+  - Check test coverage and results
+- Expected Outcome
+  - All tests pass with no failures; comprehensive test coverage achieved
+
+**Section sources**
+- [phase-2 package.json:7-12](file://phase-2/package.json#L7-L12)
+- [phase-2 assignment.test.ts:1-110](file://phase-2/src/tests/assignment.test.ts#L1-L110)
+
 ## Conclusion
-This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer. By separating concerns into distinct phases, leveraging SQLite for persistence, and building robust automation around theming, pulse generation, and email delivery, teams can operate reliably in development, staging, and production environments while maintaining strong observability, security, and operational hygiene.
+This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices. By implementing Docker multi-stage builds, comprehensive testing frameworks, and production-ready orchestration configurations, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene. The addition of containerization and testing infrastructure significantly enhances the system's reliability, maintainability, and deployment flexibility.

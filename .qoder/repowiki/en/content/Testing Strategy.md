@@ -4,21 +4,33 @@
 **Referenced Files in This Document**
 - [filters.test.ts](file://phase-1/src/tests/filters.test.ts)
 - [integration.scrape.test.ts](file://phase-1/src/tests/integration.scrape.test.ts)
-- [filters.ts](file://phase-1/src/scraper/filters.ts)
-- [playstoreScraper.ts](file://phase-1/src/scraper/playstoreScraper.ts)
 - [assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
 - [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
 - [scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 - [schema.test.ts](file://phase-2/src/tests/schema.test.ts)
 - [userPrefs.test.ts](file://phase-2/src/tests/userPrefs.test.ts)
+- [filters.ts](file://phase-1/src/scraper/filters.ts)
+- [playstoreScraper.ts](file://phase-1/src/scraper/playstoreScraper.ts)
 - [assignmentService.ts](file://phase-2/src/services/assignmentService.ts)
 - [emailService.ts](file://phase-2/src/services/emailService.ts)
 - [pulseService.ts](file://phase-2/src/services/pulseService.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [schedulerJob.ts](file://phase-2/src/jobs/schedulerJob.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced comprehensive test coverage for assignment service with detailed schema validation and persistence testing
+- Expanded email functionality testing with HTML/text template validation and PII handling verification
+- Strengthened pulse generation testing with PII scrubbing validation, word count enforcement, and object shape validation
+- Improved scheduler testing with comprehensive due-diligence logic and edge case coverage
+- Added robust user preferences CRUD testing with in-memory database validation
+- Integrated schema validation testing for Zod-based type safety
+- Updated testing architecture to cover all major backend components comprehensively
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,6 +46,8 @@
 
 ## Introduction
 This document defines a comprehensive testing strategy for the Groww App Review Insights Analyzer across phases. It covers unit testing for filter functions, service layers, and utility modules; integration testing for end-to-end workflows including scraping, filtering, LLM interactions, and email delivery; test data management and mocking strategies; environment setup; best practices for asynchronous operations and edge cases; CI patterns, coverage requirements, and quality gates; performance and load testing considerations; and practical debugging strategies for test failures.
+
+**Updated** Enhanced with comprehensive test suites covering assignment service, email functionality, pulse generation, scheduler jobs, and user preferences, providing complete backend component coverage.
 
 ## Project Structure
 The repository is split into three phases:
@@ -69,6 +83,8 @@ PLS["pulseService.ts"]
 UPR["userPrefsRepo.ts"]
 RVS["reviewsRepo.ts"]
 GROQ["groqClient.ts"]
+SJ["schedulerJob.ts"]
+PS["piiScrubber.ts"]
 end
 FTS --> FIL
 IST --> SCR
@@ -77,8 +93,11 @@ ATS --> RVS
 ATS --> UPR
 ATS --> GROQ
 ETS --> EMS
+ETS --> PS
 PTS --> PLS
 PTS --> GROQ
+PTS --> PS
+STS --> SJ
 STS --> UPR
 UTS --> UPR
 SCHEMA --> PLS
@@ -87,20 +106,22 @@ SCHEMA --> PLS
 **Diagram sources**
 - [filters.test.ts](file://phase-1/src/tests/filters.test.ts)
 - [integration.scrape.test.ts](file://phase-1/src/tests/integration.scrape.test.ts)
-- [filters.ts](file://phase-1/src/scraper/filters.ts)
-- [playstoreScraper.ts](file://phase-1/src/scraper/playstoreScraper.ts)
 - [assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
 - [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
 - [scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 - [userPrefs.test.ts](file://phase-2/src/tests/userPrefs.test.ts)
 - [schema.test.ts](file://phase-2/src/tests/schema.test.ts)
+- [filters.ts](file://phase-1/src/scraper/filters.ts)
+- [playstoreScraper.ts](file://phase-1/src/scraper/playstoreScraper.ts)
 - [assignmentService.ts](file://phase-2/src/services/assignmentService.ts)
 - [emailService.ts](file://phase-2/src/services/emailService.ts)
 - [pulseService.ts](file://phase-2/src/services/pulseService.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [schedulerJob.ts](file://phase-2/src/jobs/schedulerJob.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 **Section sources**
 - [filters.test.ts](file://phase-1/src/tests/filters.test.ts)
@@ -120,6 +141,9 @@ SCHEMA --> PLS
 - Email service: HTML/text email building and SMTP transport.
 - Scheduler and user preferences: Due-date calculation and dispatch orchestration.
 - Utilities: Date helpers and environment configuration.
+- PII scrubber: Comprehensive data sanitization for privacy compliance.
+
+**Updated** Added PII scrubber as a core component with dedicated testing coverage.
 
 **Section sources**
 - [filters.ts](file://phase-1/src/scraper/filters.ts)
@@ -130,6 +154,7 @@ SCHEMA --> PLS
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 ## Architecture Overview
 The testing architecture emphasizes isolation and determinism:
@@ -158,7 +183,9 @@ A->>DB : "persistAssignments()"
 T->>P : "generatePulse()"
 P->>DB : "read/write weekly pulses"
 P->>G : "groqJson() for ideas/note"
+P->>G : "scrubPii() for privacy"
 T->>E : "buildEmailHtml()/buildEmailText()"
+E->>G : "scrubPii() for privacy"
 E-->>T : "sendPulseEmail() (stubbed)"
 ```
 
@@ -171,6 +198,7 @@ E-->>T : "sendPulseEmail() (stubbed)"
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 ## Detailed Component Analysis
 
@@ -318,6 +346,7 @@ L --> M["Return WeeklyPulse"]
 - [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
 - [pulseService.ts](file://phase-2/src/services/pulseService.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 **Section sources**
 - [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
@@ -348,6 +377,7 @@ Sender-->>ET : "logInfo(messageId)"
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
 - [emailService.ts](file://phase-2/src/services/emailService.ts)
 - [pulseService.ts](file://phase-2/src/services/pulseService.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 **Section sources**
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
@@ -378,10 +408,12 @@ N --> C
 - [scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [emailService.ts](file://phase-2/src/services/emailService.ts)
+- [schedulerJob.ts](file://phase-2/src/jobs/schedulerJob.ts)
 
 **Section sources**
 - [scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
+- [schedulerJob.ts](file://phase-2/src/jobs/schedulerJob.ts)
 
 ### User Preferences CRUD Testing (Phase 2)
 Approach:
@@ -413,6 +445,49 @@ Approach:
 **Section sources**
 - [schema.test.ts](file://phase-2/src/tests/schema.test.ts)
 
+### PII Scrubber Testing (Phase 2)
+**New** Comprehensive testing for privacy compliance and data sanitization.
+
+Approach:
+- Validate redaction of email addresses, phone numbers, URLs, and social media handles.
+- Test regex patterns for various Indian and international phone number formats.
+- Ensure clean text remains unchanged while sensitive data is properly redacted.
+
+Key validations:
+- Email addresses are redacted with [redacted] placeholder.
+- Indian mobile numbers (6-9 followed by 9 digits) are redacted.
+- International phone numbers with optional country codes are redacted.
+- URLs are redacted from text content.
+- Social media @handles are redacted.
+- Non-sensitive text remains intact.
+
+```mermaid
+flowchart TD
+A["PII Input Text"] --> B["Pattern Matching"]
+B --> C{"Email Pattern?"}
+C --> |Yes| D["Replace with [redacted]"]
+C --> |No| E{"Phone Pattern?"}
+E --> |Yes| F["Replace with [redacted]"]
+E --> |No| G{"URL Pattern?"}
+G --> |Yes| H["Replace with [redacted]"]
+G --> |No| I{"Handle Pattern?"}
+I --> |Yes| J["Replace with [redacted]"]
+I --> |No| K["Keep Original"]
+D --> L["Output Sanitized Text"]
+F --> L
+H --> L
+J --> L
+K --> L
+```
+
+**Diagram sources**
+- [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
+
+**Section sources**
+- [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
+
 ## Dependency Analysis
 Testing dependencies and coupling:
 - Unit tests depend on pure functions and in-memory DBs; they avoid external I/O.
@@ -428,9 +503,12 @@ ATS["assignment.test.ts"] --> ASS["assignmentService.ts"]
 ATS --> RVS["reviewsRepo.ts"]
 ATS --> GROQ["groqClient.ts"]
 ETS["email.test.ts"] --> EMS["emailService.ts"]
+ETS --> PS["piiScrubber.ts"]
 PTS["pulse.test.ts"] --> PLS["pulseService.ts"]
 PTS --> GROQ
-STS["scheduler.test.ts"] --> UPR["userPrefsRepo.ts"]
+PTS --> PS
+STS["scheduler.test.ts"] --> SJ["schedulerJob.ts"]
+STS --> UPR["userPrefsRepo.ts"]
 UTS["userPrefs.test.ts"] --> UPR
 SCHEMA["schema.test.ts"] --> PLS
 ```
@@ -452,6 +530,8 @@ SCHEMA["schema.test.ts"] --> PLS
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [schedulerJob.ts](file://phase-2/src/jobs/schedulerJob.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 **Section sources**
 - [filters.test.ts](file://phase-1/src/tests/filters.test.ts)
@@ -476,8 +556,9 @@ SCHEMA["schema.test.ts"] --> PLS
 - External services:
   - Introduce retry/backoff with jitter for LLM calls.
   - Use connection pooling for SMTP where applicable.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Privacy processing:
+  - PII scrubbing uses regex-based patterns; ensure efficient pattern compilation.
+  - Consider caching compiled regex patterns for repeated use.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -491,21 +572,27 @@ Common issues and resolutions:
   - Validate nextSendUtc across week boundaries and time zone approximations.
 - Database inconsistencies:
   - Use in-memory DB fixtures to replicate schema and data precisely.
+- **Updated** PII scrubbing failures:
+  - Verify regex patterns match expected formats for emails, phones, URLs, and handles.
+  - Test edge cases like international numbers with country codes.
+  - Ensure scrubber handles Unicode and special characters correctly.
 
 Debugging strategies:
 - Add granular logs around critical steps (batch fetch, filter decisions, LLM prompts).
 - Capture and assert intermediate structures (assignments, top themes, quotes).
 - Use deterministic fixtures and controlled time references for scheduling tests.
+- **Updated** Implement comprehensive logging for PII scrubbing operations to trace redaction patterns.
 
 **Section sources**
 - [emailService.ts](file://phase-2/src/services/emailService.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
+- [piiScrubber.ts](file://phase-2/src/services/piiScrubber.ts)
 
 ## Conclusion
 The testing strategy balances unit rigor with pragmatic integration coverage. By isolating external dependencies, leveraging in-memory databases, and validating critical behaviors (PII scrubbing, schema compliance, batching, and scheduling), the suite ensures reliability across phases. Extending coverage to include performance and load tests will further strengthen confidence in production deployments.
 
-[No sources needed since this section summarizes without analyzing specific files]
+**Updated** The comprehensive test suite now covers all major backend components including assignment service, email functionality, pulse generation, scheduler jobs, user preferences, and PII scrubbing, providing complete assurance of system reliability and data privacy compliance.
 
 ## Appendices
 
@@ -513,22 +600,19 @@ The testing strategy balances unit rigor with pragmatic integration coverage. By
 - Use fixtures for LLM prompts and expected outputs to maintain repeatability.
 - For database-backed tests, construct schema and seed data inline to avoid shared state.
 - Snapshot-like assertions for HTML/text bodies to detect unintended changes.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Implement comprehensive PII test fixtures covering various sensitive data formats.
 
 ### Mock Strategies for External Services
 - Play Store scraper: Limit pagination and return synthetic batches in unit tests.
 - Groq client: Stub chat completions to return deterministic JSON; assert prompt construction and schema hints.
 - SMTP transport: Stub nodemailer to record send calls without network I/O.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Use comprehensive mock strategies for all external dependencies including LLM providers and email services.
 
 ### Test Environment Setup
 - Node.js built-in test runner with strict assertions.
 - Environment variables for SMTP and Groq; optional integration flag for scraping tests.
 - In-memory SQLite for persistence tests; ensure migrations are mirrored in tests.
-
-[No sources needed since this section provides general guidance]
+- **Updated** Configure separate test environments for different service components.
 
 ### Continuous Integration Patterns
 - Quality gates:
@@ -538,5 +622,10 @@ The testing strategy balances unit rigor with pragmatic integration coverage. By
   - Run independent suites concurrently; serialize integration tests gated by environment flags.
 - Artifacts:
   - Capture logs and test reports; retain snapshots for template validation.
+- **Updated** Implement comprehensive CI/CD pipelines with separate stages for unit, integration, and end-to-end testing.
 
-[No sources needed since this section provides general guidance]
+### Test Coverage Requirements
+- **Updated** Target minimum 90% coverage for assignment service, email service, and pulse service.
+- Ensure 100% coverage for PII scrubbing and user preferences components.
+- Maintain 80%+ coverage across all scheduler and database interaction components.
+- Regularly audit coverage reports and prioritize high-risk areas.
