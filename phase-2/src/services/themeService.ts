@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { db } from '../db';
+import { dbAdapter } from '../db/dbAdapter';
 import { groqJson } from './groqClient';
 import { ReviewRow } from '../domain/review';
 
@@ -48,32 +48,30 @@ export async function generateThemesFromReviews(reviews: ReviewRow[]): Promise<T
   return uniqueThemes;
 }
 
-export function upsertThemes(themes: ThemeDef[], window?: { from?: string; to?: string }): number[] {
+export async function upsertThemes(themes: ThemeDef[], window?: { from?: string; to?: string }): Promise<number[]> {
   const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO themes (name, description, created_at, valid_from, valid_to)
-    VALUES (?, ?, ?, ?, ?)
-  `);
-
   const ids: number[] = [];
-  const tx = db.transaction(() => {
-    for (const t of themes) {
-      const info = insert.run(t.name, t.description, now, window?.from ?? null, window?.to ?? null);
-      ids.push(Number(info.lastInsertRowid));
-    }
-  });
-
-  tx();
+  
+  for (const t of themes) {
+    const result = await dbAdapter.run(
+      `INSERT INTO themes (name, description, created_at, valid_from, valid_to)
+       VALUES (?, ?, ?, ?, ?)`,
+      [t.name, t.description, now, window?.from ?? null, window?.to ?? null]
+    );
+    ids.push(result.lastID!);
+  }
+  
   return ids;
 }
 
-export function listLatestThemes(limit = 5): { id: number; name: string; description: string }[] {
-  const stmt = db.prepare(`
-    SELECT id, name, description
-    FROM themes
-    ORDER BY created_at DESC
-    LIMIT ?;
-  `);
-  return stmt.all(limit) as any[];
+export async function listLatestThemes(limit = 5): Promise<{ id: number; name: string; description: string }[]> {
+  const result = await dbAdapter.query(
+    `SELECT id, name, description
+     FROM themes
+     ORDER BY created_at DESC
+     LIMIT ?`,
+    [limit]
+  );
+  return result.rows;
 }
 
