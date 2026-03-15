@@ -22,18 +22,30 @@ export async function generateThemesFromReviews(reviews: ReviewRow[]): Promise<T
 
   const system =
     'You are a product analyst. You will propose 3 to 5 themes from app store reviews. ' +
-    'Do not include any personally identifying information. Do not include usernames, emails, phone numbers, IDs, or links.';
+    'Do not include any personally identifying information. Do not include usernames, emails, phone numbers, IDs, or links. ' +
+    'Each theme must have a UNIQUE name - do not repeat the same theme name.';
 
   const user =
     `Analyze the following Groww Android app reviews and propose 3 to 5 themes max.\n` +
-    `Each theme must have a short name and a one-sentence description.\n\n` +
+    `Each theme must have a short UNIQUE name and a one-sentence description.\n` +
+    `Avoid duplicate theme names - each theme should be distinct.\n\n` +
     sample.map((t, i) => `- (${i + 1}) ${t}`).join('\n');
 
   const schemaHint = `{"themes":[{"name":"string","description":"string"}]}`;
 
   const raw = await groqJson<unknown>({ system, user, schemaHint });
   const parsed = GenerateThemesResponseSchema.parse(raw);
-  return parsed.themes;
+  
+  // Deduplicate themes by name (case-insensitive)
+  const seen = new Set<string>();
+  const uniqueThemes = parsed.themes.filter(t => {
+    const key = t.name.toLowerCase().trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  
+  return uniqueThemes;
 }
 
 export function upsertThemes(themes: ThemeDef[], window?: { from?: string; to?: string }): number[] {
