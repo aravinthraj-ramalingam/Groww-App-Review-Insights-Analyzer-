@@ -19,6 +19,7 @@
 - [pulse.test.ts](file://phase-2/src/tests/pulse.test.ts)
 - [assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
+- [cleanupDuplicateThemes.ts](file://phase-2/scripts/cleanupDuplicateThemes.ts)
 </cite>
 
 ## Update Summary
@@ -29,6 +30,9 @@
 - Strengthened validation and quality assurance processes with improved error handling
 - Expanded content formatting capabilities with enhanced HTML template rendering
 - Improved performance optimization for weekly batch processing with better memory management
+- **Added deduplication logic for unique theme selection in weekly pulse generation**
+- **Implemented case-insensitive theme name deduplication to prevent duplicate themes**
+- **Enhanced fallback mechanism for empty assignment scenarios**
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,14 +49,17 @@
 ## Introduction
 This document describes the sophisticated weekly pulse generation system that transforms raw app store reviews into curated, actionable insights. The system orchestrates a comprehensive weekly insights pipeline that combines theme analysis with user feedback to generate actionable recommendations. It covers the complete lifecycle from assigned themes to aggregated insights, including sentiment-aware aggregation, LLM-powered note generation, robust content formatting (HTML and plain text), validation and quality assurance, performance optimization for weekly batch processing, and delivery tracking. The system provides practical examples, customization options, and comprehensive error recovery strategies.
 
+**Updated** Enhanced with deduplication logic ensuring unique themes are selected for pulse creation and preventing duplicate theme names in top themes lists.
+
 ## Project Structure
 The weekly pulse system resides in phase-2 and orchestrates multiple sophisticated services:
-- Advanced theme generation and persistence with configurable windows
+- Advanced theme generation and persistence with configurable windows and deduplication
 - Intelligent review-to-theme assignment with batching and confidence scoring
-- Sophisticated weekly pulse aggregation with sentiment analysis and recommendation generation
+- Sophisticated weekly pulse aggregation with sentiment analysis, recommendation generation, and unique theme selection
 - Enhanced email rendering with PII scrubbing and dual-format delivery
 - Automated scheduler with delivery tracking and retry mechanisms
 - Comprehensive database schema supporting themes, assignments, pulses, preferences, and job scheduling
+- Theme cleanup utilities for maintaining data integrity
 
 ```mermaid
 graph TB
@@ -67,14 +74,15 @@ subgraph "Database Layer"
 DBIDX["db/index.ts<br/>Schema & Migrations"]
 end
 subgraph "Service Layer"
-THEME["themeService.ts<br/>Advanced Theme Generation"]
+THEME["themeService.ts<br/>Advanced Theme Generation<br/>Deduplication Logic"]
 ASSIGN["assignmentService.ts<br/>Intelligent Assignment"]
-PULSE["pulseService.ts<br/>Sophisticated Pulse Generation"]
+PULSE["pulseService.ts<br/>Sophisticated Pulse Generation<br/>Unique Theme Selection"]
 EMAIL["emailService.ts<br/>Enhanced Email Delivery"]
 PREFS["userPrefsRepo.ts<br/>Preference Management"]
 GROQ["groqClient.ts<br/>LLM Orchestration"]
 SCRUB["piiScrubber.ts<br/>PII Protection"]
 LOG["logger.ts<br/>Observability"]
+CLEAN["cleanupDuplicateThemes.ts<br/>Theme Integrity Maintenance"]
 end
 subgraph "Job Layer"
 SCHED["schedulerJob.ts<br/>Automated Scheduling"]
@@ -91,6 +99,7 @@ DBIDX --> ASSIGN
 DBIDX --> PULSE
 DBIDX --> PREFS
 DBIDX --> SCHED
+DBIDX --> CLEAN
 PIPE --> THEME
 PIPE --> ASSIGN
 PIPE --> PULSE
@@ -109,9 +118,9 @@ SCHED --> PREFS
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
 - [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
@@ -119,21 +128,23 @@ SCHED --> PREFS
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [runPulsePipeline.ts:1-52](file://phase-2/scripts/runPulsePipeline.ts#L1-L52)
+- [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 
 **Section sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
 
 ## Core Components
-- **Advanced Theme Service**: Generates sophisticated themes from sampled reviews with configurable validity windows, using LLMs with strict schema validation and cost-controlled text sampling
+- **Advanced Theme Service**: Generates sophisticated themes from sampled reviews with configurable validity windows, using LLMs with strict schema validation and cost-controlled text sampling. **Enhanced with case-insensitive deduplication to ensure unique theme names**.
 - **Intelligent Assignment Service**: Performs batched review-to-theme assignment with confidence scoring, supporting "Other" category fallback and bulk persistence with conflict resolution
-- **Sophisticated Pulse Service**: Orchestrates comprehensive weekly pulse generation with sentiment-aware aggregation, representative quote selection, LLM-powered action recommendations, and strict quality controls
+- **Sophisticated Pulse Service**: Orchestrates comprehensive weekly pulse generation with sentiment-aware aggregation, representative quote selection, LLM-powered action recommendations, strict quality controls, and **unique theme selection logic to prevent duplicate theme names**
 - **Enhanced Email Service**: Renders responsive HTML and plain-text emails with comprehensive PII scrubbing, dual-format delivery, and subject line customization
 - **Automated Scheduler**: Manages weekly pulse generation with due preference detection, job scheduling, retry mechanisms, and comprehensive delivery tracking
 - **Preference Management**: Handles user preferences with timezone support, preferred send times, and active preference maintenance
 - **LLM Orchestration**: Provides robust JSON extraction, retry mechanisms, and schema enforcement for all AI-powered operations
 - **Data Protection**: Implements comprehensive PII scrubbing across all user-facing content
 - **Observability**: Centralized logging for monitoring and debugging all system operations
+- **Theme Cleanup Utilities**: **New component for maintaining theme data integrity through duplicate detection and removal**
 
 **Section sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
@@ -144,9 +155,10 @@ SCHED --> PREFS
 - [userPrefsRepo.ts:21-56](file://phase-2/src/services/userPrefsRepo.ts#L21-L56)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [piiScrubber.ts:22-28](file://phase-2/src/services/piiScrubber.ts#L22-L28)
+- [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 
 ## Architecture Overview
-The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation, and automated delivery with tracking.
+The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation with unique theme selection, and automated delivery with tracking.
 
 ```mermaid
 sequenceDiagram
@@ -167,6 +179,8 @@ Cron->>Gen : generatePulse(weekStart)<br/>Initiate pulse generation
 Note over Gen,DB : Theme Analysis Phase
 Gen->>Theme : listLatestThemes(5)<br/>Load current themes
 Theme->>DB : SELECT themes<br/>Fetch theme definitions
+Note over Gen,DB : Unique Theme Deduplication
+Gen->>Gen : Filter unique themes by name<br/>Case-insensitive comparison
 Note over Gen,DB : Assignment Phase
 Gen->>Repo : listReviewsForWeek(weekStart)<br/>Get weekly reviews
 Repo->>DB : SELECT reviews<br/>Load review data
@@ -202,26 +216,28 @@ end
 ## Detailed Component Analysis
 
 ### Advanced Theme Generation and Persistence
-The theme generation system implements sophisticated analysis capabilities with configurable validity windows and strict quality controls. The system samples recent reviews, truncates text for cost optimization, and leverages LLMs to propose 3-5 themes with concise names and descriptions.
+The theme generation system implements sophisticated analysis capabilities with configurable validity windows and strict quality controls. The system samples recent reviews, truncates text for cost optimization, and leverages LLMs to propose 3-5 themes with concise names and descriptions. **Enhanced with case-insensitive deduplication to ensure unique theme names**.
 
 ```mermaid
 flowchart TD
 Start(["Theme Generation Start"]) --> Sample["Sample Recent Reviews<br/>Truncate Text<br/>Cost Control"]
-Sample --> Prompt["Build System & User Prompts<br/>Strict Schema Requirements"]
+Sample --> Prompt["Build System & User Prompts<br/>Strict Schema Requirements<br/>Unique Name Constraint"]
 Prompt --> CallLLM["groqJson<br/>JSON Extraction & Validation"]
 CallLLM --> Parse["Zod Schema Validation<br/>Length & Format Checks"]
-Parse --> Window["Apply Validity Windows<br/>Configurable Time Frames"]
+Parse --> Dedup["Case-Insensitive Deduplication<br/>Remove Duplicate Names"]
+Dedup --> Window["Apply Validity Windows<br/>Configurable Time Frames"]
 Window --> Upsert["Bulk Upsert Themes<br/>Unique Constraints"]
 Upsert --> End(["Theme Generation Complete"])
 ```
 
 **Diagram sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
+- [themeService.ts:39-48](file://phase-2/src/services/themeService.ts#L39-L48)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 
 **Section sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [themeService.ts:39-56](file://phase-2/src/services/themeService.ts#L39-L56)
+- [themeService.ts:39-48](file://phase-2/src/services/themeService.ts#L39-L48)
 
 ### Intelligent Review-to-Theme Assignment
 The assignment system implements advanced batch processing with confidence scoring and intelligent fallback mechanisms. Reviews are processed in controlled batches to manage token usage while maintaining accuracy through schema enforcement and conflict resolution.
@@ -254,20 +270,21 @@ DB-->>Assign : persisted counts<br/>Transaction results
 - [assignmentService.ts:73-97](file://phase-2/src/services/assignmentService.ts#L73-L97)
 
 ### Sophisticated Weekly Pulse Aggregation and Generation
-The pulse generation system implements comprehensive aggregation with sentiment-aware analysis, representative quote selection, and LLM-powered recommendation generation. The system handles edge cases gracefully and maintains strict quality standards.
+The pulse generation system implements comprehensive aggregation with sentiment-aware analysis, representative quote selection, and LLM-powered recommendation generation. **Enhanced with unique theme selection logic to prevent duplicate theme names and improved fallback mechanisms**.
 
 ```mermaid
 flowchart TD
 WS["week_start Input"] --> LoadThemes["listLatestThemes(5)<br/>Load Current Themes"]
-WS --> LoadReviews["listReviewsForWeek(week_start)<br/>Get Weekly Reviews"]
+WS --> LoadReviews["listReviewsForWeek(weekStart)<br/>Get Weekly Reviews"]
 LoadReviews --> Stats["getWeekThemeStats<br/>Aggregate Per-Theme Stats"]
 Stats --> Top3["topThemes = slice(0,3)<br/>Select Top 3 Themes"]
 AltCheck{"Assignments Exist?"}
 Top3 --> AltCheck
 AltCheck --> |Yes| Effective["Use Actual Theme Stats"]
 AltCheck --> |No| Fallback["Fallback to Latest Themes<br/>Zero Counts"]
-Effective --> Quotes["pickQuotes<br/>Select Representative Quotes<br/>PII-Free & Distinct"]
-Fallback --> Quotes
+Effective --> Unique["Filter Unique Themes by Name<br/>Case-insensitive Deduplication"]
+Fallback --> Unique
+Unique --> Quotes["pickQuotes<br/>Select Representative Quotes<br/>PII-Free & Distinct"]
 Quotes --> Ideas["generateActionIdeas<br/>3 Concise Recommendations<br/>Grounded in Themes & Quotes"]
 Quotes --> Note["generateWeeklyNote<br/>Strict Word Limits<br/>Retry Mechanism"]
 Ideas --> Note
@@ -283,6 +300,7 @@ Save --> End(["Weekly Pulse Generated"])
 - [pulseService.ts:109-132](file://phase-2/src/services/pulseService.ts#L109-L132)
 - [pulseService.ts:134-172](file://phase-2/src/services/pulseService.ts#L134-L172)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
+- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
 - [db/index.ts:41-51](file://phase-2/src/db/index.ts#L41-L51)
 
 **Section sources**
@@ -290,6 +308,7 @@ Save --> End(["Weekly Pulse Generated"])
 - [pulseService.ts:79-105](file://phase-2/src/services/pulseService.ts#L79-L105)
 - [pulseService.ts:109-172](file://phase-2/src/services/pulseService.ts#L109-L172)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
+- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
 
 ### Enhanced Content Formatting and Delivery
 The email system provides comprehensive dual-format delivery with sophisticated HTML rendering and plain-text alternatives. The system implements robust PII scrubbing and responsive design for optimal user experience.
@@ -357,6 +376,27 @@ end
 **Section sources**
 - [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
+
+### Theme Integrity Maintenance
+**New Component**: The theme cleanup utility provides automated maintenance of theme data integrity by detecting and removing duplicate theme names while preserving the most recent versions.
+
+```mermaid
+flowchart TD
+Start(["Theme Cleanup Start"]) --> Query["Query Themes by Name<br/>Group & Count Duplicates"]
+Query --> Detect["Detect Duplicate Names<br/>Count > 1"]
+Detect --> Iterate["Iterate Through Duplicates"]
+Iterate --> Order["Order by Created At DESC<br/>Most Recent First"]
+Order --> Keep["Keep Most Recent Theme<br/>Delete Others"]
+Keep --> Cascade["Cascade Delete<br/>Review Theme Associations"]
+Cascade --> Verify["Verify Cleanup<br/>Confirm Integrity"]
+Verify --> End(["Cleanup Complete"])
+```
+
+**Diagram sources**
+- [cleanupDuplicateThemes.ts:7-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L7-L59)
+
+**Section sources**
+- [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 
 ### Data Models and Schema
 The system implements a comprehensive database schema designed for scalability and performance. The schema supports complex relationships while maintaining data integrity and enabling efficient querying.
@@ -427,6 +467,7 @@ The system demonstrates excellent architectural principles with strong cohesion 
 - **Coupling**: Minimal cross-service dependencies with standardized interfaces and shared clients
 - **External Integrations**: Robust integration with Groq for LLM capabilities, Nodemailer for email delivery, and better-sqlite3 for data persistence
 - **Resilience**: Comprehensive retry mechanisms, error handling, and graceful degradation strategies
+- **Data Integrity**: **Enhanced with theme cleanup utilities and deduplication logic for consistent data quality**
 
 ```mermaid
 graph LR
@@ -444,19 +485,21 @@ D --> A
 D --> P
 D --> U
 D --> J
+C["cleanupDuplicateThemes.ts<br/>Theme Integrity"] --> D
 ```
 
 **Diagram sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [piiScrubber.ts:1-29](file://phase-2/src/services/piiScrubber.ts#L1-L29)
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
 - [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 
 **Section sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
@@ -471,6 +514,7 @@ The system implements comprehensive performance optimizations designed for weekl
 - **Retry Strategy**: Progressive backoff with increasing temperature improves JSON extraction reliability and reduces API failures
 - **Concurrency Control**: Sequential processing per scheduler tick prevents resource contention while allowing for horizontal scaling
 - **Caching Strategy**: Theme caching and review batching minimize redundant database queries and LLM calls
+- **Deduplication Efficiency**: **Case-insensitive deduplication uses Set-based lookups for O(n) performance in theme name filtering**
 
 ## Troubleshooting Guide
 Comprehensive troubleshooting guidance for common operational issues:
@@ -479,6 +523,7 @@ Comprehensive troubleshooting guidance for common operational issues:
 - No themes found: Verify theme generation has completed successfully and themes exist in the database with proper validity windows
 - Generation failures: Check Groq API key configuration, model availability, and network connectivity
 - Schema validation errors: Review theme name and description constraints in the Zod schemas
+- **Duplicate theme names**: Use the cleanup utility script to remove duplicate themes while preserving the most recent versions
 
 **Assignment Processing Problems**
 - Empty assignment results: Ensure reviews are properly loaded for the target week and themes have been generated
@@ -489,31 +534,41 @@ Comprehensive troubleshooting guidance for common operational issues:
 - Missing assignments: Confirm assignment process completed successfully before pulse generation
 - Quality validation errors: Check word count limits, schema validation, and PII scrubbing effectiveness
 - Version conflicts: Monitor for concurrent pulse generation attempts and handle duplicate detection
+- **Duplicate theme names in top themes**: The deduplication logic automatically removes duplicates, but verify the effectiveTopThemes array contains unique entries
 
 **Delivery and Tracking Issues**
 - SMTP configuration errors: Verify host, port, username, and password settings in environment variables
 - Email delivery failures: Check recipient addresses, spam filtering, and email provider restrictions
 - Job tracking inconsistencies: Review scheduled_jobs table for proper status updates and error logging
 
+**Theme Integrity Issues**
+- **Duplicate themes detected**: Run the cleanupDuplicateThemes script to resolve naming conflicts
+- **Case sensitivity problems**: The deduplication logic handles case-insensitive comparisons automatically
+- **Theme name conflicts**: Use the unique themes filtering to ensure no duplicate names in pulse generation
+
 **Section sources**
 - [pulseService.ts:180-188](file://phase-2/src/services/pulseService.ts#L180-L188)
+- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
 - [groqClient.ts:35-65](file://phase-2/src/services/groqClient.ts#L35-L65)
 - [emailService.ts:99-102](file://phase-2/src/services/emailService.ts#L99-L102)
 - [schedulerJob.ts:75-80](file://phase-2/src/jobs/schedulerJob.ts#L75-L80)
+- [cleanupDuplicateThemes.ts:10-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L10-L59)
 
 ## Conclusion
-The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
+The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. **The addition of deduplication logic ensures unique themes are selected for pulse creation, preventing duplicate theme names in top themes lists and improving data quality**. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
 
 ## Appendices
 
 ### Example Scenarios
 **New Theme Cycle Implementation**
 - Execute theme generation from recent reviews with configurable validity windows
+- **Case-insensitive deduplication removes duplicate theme names automatically**
 - Upsert themes into the database with timestamp tracking
 - Process subsequent assignment and pulse generation cycles automatically
 
 **Empty Week Handling Strategy**
 - Graceful fallback to latest themes with zero counts when no assignments exist
+- **Unique themes filtering ensures no duplicate names even with fallback**
 - Maintains pulse generation continuity even during low-volume periods
 - Preserves historical context through version management
 
@@ -527,11 +582,17 @@ The enhanced weekly pulse generation system represents a sophisticated solution 
 - Implement flexible scheduling based on business requirements
 - Support multiple recipients with individualized delivery preferences
 
+**Theme Integrity Maintenance**
+- **Run cleanupDuplicateThemes script to remove duplicate theme names**
+- **Monitor for case-sensitive duplicates using the deduplication logic**
+- **Prevent theme name conflicts before pulse generation begins**
+
 **Section sources**
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
-- [pulseService.ts:200-211](file://phase-2/src/services/pulseService.ts#L200-L211)
+- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
 - [emailService.ts:9-62](file://phase-2/src/services/emailService.ts#L9-L62)
 - [userPrefsRepo.ts:62-77](file://phase-2/src/services/userPrefsRepo.ts#L62-L77)
+- [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 
 ### Validation and Quality Assurance
 The system implements comprehensive validation mechanisms ensuring data integrity and quality:
@@ -547,12 +608,14 @@ The system implements comprehensive validation mechanisms ensuring data integrit
 - PII scrubbing applied as final safety pass before storage and delivery
 - Confidence threshold validation for assignment accuracy
 - Duplicate detection and version management for pulse consistency
+- **Case-insensitive theme name deduplication prevents duplicate entries in top themes**
 
 **Testing Framework**
 - Unit tests covering PII redaction effectiveness and content sanitization
 - Word count validation testing for note generation limits
 - Email content testing for HTML and plain-text formatting accuracy
 - Assignment persistence testing with database constraint validation
+- **Theme deduplication testing for unique name filtering**
 
 **Section sources**
 - [pulseService.ts:42-48](file://phase-2/src/services/pulseService.ts#L42-L48)
@@ -582,3 +645,33 @@ Critical configuration requirements for system operation:
 
 **Section sources**
 - [env.ts:9-21](file://phase-2/src/config/env.ts#L9-L21)
+
+### Deduplication Implementation Details
+**Enhanced Component**: The deduplication logic in pulseService.ts ensures unique themes are selected for weekly pulse generation:
+
+```typescript
+// Ensure unique themes by name
+const uniqueThemes = themes.filter((t, index, self) => 
+  index === self.findIndex((tt) => tt.name === t.name)
+);
+
+const effectiveTopThemes: ThemeSummary[] =
+  topThemes.length >= 1
+    ? topThemes
+    : uniqueThemes.slice(0, 3).map((t) => ({
+        theme_id: t.id,
+        name: t.name,
+        description: t.description,
+        review_count: 0,
+        avg_rating: 0
+      }));
+```
+
+**Key Features**:
+- **Case-insensitive comparison**: Uses exact name matching for duplicate detection
+- **Preserves order**: Maintains original theme ordering while removing duplicates
+- **Fallback mechanism**: Automatically falls back to unique themes when assignments are unavailable
+- **Efficient filtering**: Uses Set-based approach for O(n) performance
+
+**Section sources**
+- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)

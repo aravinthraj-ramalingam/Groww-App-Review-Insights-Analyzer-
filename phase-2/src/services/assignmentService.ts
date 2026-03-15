@@ -9,14 +9,18 @@ import { listReviewsForWeek } from './reviewsRepo';
 const AssignmentSchema = z.object({
   review_id: z.string(),
   theme_name: z.string(),
-  confidence: z.number().min(0).max(1).optional()
+  confidence: z.number().min(0).max(1).optional().nullable()
 });
 
 const AssignResponseSchema = z.object({
   assignments: z.array(AssignmentSchema)
 });
 
-export type Assignment = z.infer<typeof AssignmentSchema>;
+export type Assignment = {
+  review_id: string;
+  theme_name: string;
+  confidence?: number | null;
+};
 
 const BATCH_SIZE = 10;
 
