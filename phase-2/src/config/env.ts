@@ -11,7 +11,7 @@ export const config = {
   port: Number(process.env.PORT || 4002),
 
   groqApiKey: process.env.GROQ_API_KEY || '',
-  groqModel: process.env.GROQ_MODEL || 'llama-3.1-70b-versatile',
+  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
 
   smtpHost: process.env.SMTP_HOST || '',
   smtpPort: Number(process.env.SMTP_PORT || 587),
