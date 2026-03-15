@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { dbAdapter } from '../db/dbAdapter';
 import { groqJson } from './groqClient';
 import { ReviewRow } from '../domain/review';
+import { logInfo } from '../core/logger';
 
 const ThemeSchema = z.object({
   name: z.string().min(2).max(60),
@@ -53,12 +54,21 @@ export async function upsertThemes(themes: ThemeDef[], window?: { from?: string;
   const ids: number[] = [];
   
   for (const t of themes) {
-    const result = await dbAdapter.run(
-      `INSERT INTO themes (name, description, created_at, valid_from, valid_to)
-       VALUES (?, ?, ?, ?, ?)`,
-      [t.name, t.description, now, window?.from ?? null, window?.to ?? null]
-    );
-    ids.push(result.lastID!);
+    try {
+      const result = await dbAdapter.run(
+        `INSERT INTO themes (name, description, created_at, valid_from, valid_to)
+         VALUES (?, ?, ?, ?, ?)`,
+        [t.name, t.description, now, window?.from ?? null, window?.to ?? null]
+      );
+      ids.push(result.lastID!);
+    } catch (err: any) {
+      // If duplicate theme name exists, skip it
+      if (err.message?.includes('duplicate') || err.message?.includes('unique')) {
+        logInfo('Skipping duplicate theme', { name: t.name });
+        continue;
+      }
+      throw err;
+    }
   }
   
   return ids;

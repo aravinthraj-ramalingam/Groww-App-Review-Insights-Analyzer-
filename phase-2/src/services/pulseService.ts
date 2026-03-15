@@ -232,18 +232,10 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
 
   const now = new Date().toISOString();
   
-  // Use INSERT with ON CONFLICT to handle duplicate week_start
+  // Insert new pulse with incremented version (no conflict handling needed since version is different)
   const result = await dbAdapter.run(
     `INSERT INTO weekly_pulses (week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (week_start) DO UPDATE SET
-       week_end = excluded.week_end,
-       top_themes = excluded.top_themes,
-       user_quotes = excluded.user_quotes,
-       action_ideas = excluded.action_ideas,
-       note_body = excluded.note_body,
-       created_at = excluded.created_at,
-       version = excluded.version + 1`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       weekStart,
       weekEnd,
@@ -256,19 +248,7 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
     ]
   );
 
-  // Get the pulse by week_start since we may have updated instead of inserted
-  const pulseResult = await dbAdapter.queryOne(
-    `SELECT * FROM weekly_pulses WHERE week_start = ? ORDER BY version DESC LIMIT 1`,
-    [weekStart]
-  );
-  if (!pulseResult) throw new Error('Failed to retrieve pulse after insert/update');
-  
-  return {
-    ...pulseResult,
-    top_themes: JSON.parse(pulseResult.top_themes),
-    user_quotes: JSON.parse(pulseResult.user_quotes),
-    action_ideas: JSON.parse(pulseResult.action_ideas)
-  };
+  return (await getPulse(result.lastID!))!;
 }
 
 export async function getPulse(id: number): Promise<WeeklyPulse | null> {

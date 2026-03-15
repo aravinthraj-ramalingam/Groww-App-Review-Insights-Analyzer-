@@ -87,7 +87,7 @@ function Pulses() {
         <div className="card-header">
           <h2 className="card-title">Generate New Pulse</h2>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="form-group" style={{ flex: 1, minWidth: '250px', marginBottom: 0 }}>
             <label className="form-label">Week Starting (Monday)</label>
             <input
@@ -98,7 +98,8 @@ function Pulses() {
               style={{ width: '100%' }}
             />
           </div>
-          <div style={{ marginTop: '1.5rem' }}>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label" style={{ visibility: 'hidden' }}>Action</label>
             <button 
               className="btn btn-primary" 
               onClick={handleGenerate}
@@ -146,7 +147,24 @@ function Pulses() {
                       </small>
                     </td>
                     <td>
-                      {pulse.top_themes.map(t => t.name).join(', ')}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {pulse.top_themes.map((t, i) => (
+                          <span 
+                            key={i}
+                            style={{ 
+                              background: 'var(--primary-light)',
+                              color: 'var(--primary)',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '12px',
+                              fontSize: '0.85rem',
+                              fontWeight: 500,
+                              border: '1px solid var(--primary)'
+                            }}
+                          >
+                            {t.name.replace(/([A-Z])/g, ' $1').trim()}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td>{pulse.user_quotes.length} quotes</td>
                     <td>{pulse.action_ideas.length} ideas</td>
