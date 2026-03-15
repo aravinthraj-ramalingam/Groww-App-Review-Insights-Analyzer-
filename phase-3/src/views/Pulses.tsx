@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { pulsesApi } from '../services/api'
 import { WeeklyPulse } from '../types'
 
+// Helper to format theme names with spaces
+function formatThemeName(name: string): string {
+  return name.replace(/([A-Z])/g, ' $1').trim()
+}
+
 function Pulses() {
   const [pulses, setPulses] = useState<WeeklyPulse[]>([])
   const [loading, setLoading] = useState(true)
@@ -161,7 +166,7 @@ function Pulses() {
                               border: '1px solid var(--primary)'
                             }}
                           >
-                            {t.name.replace(/([A-Z])/g, ' $1').trim()}
+                            {formatThemeName(t.name)}
                           </span>
                         ))}
                       </div>
