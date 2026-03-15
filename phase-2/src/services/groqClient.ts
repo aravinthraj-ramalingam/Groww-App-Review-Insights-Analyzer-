@@ -32,18 +32,62 @@ function extractJson(raw: string): string {
     }
   }
   
-  // Fix unescaped newlines inside JSON strings (common LLM issue)
-  // Replace actual newlines inside string values with escaped \n
-  cleaned = cleaned.replace(/:\s*"([^"]*)"/g, (match, content) => {
-    // Escape unescaped newlines and carriage returns within the string content
-    const escaped = content
-      .replace(/\\/g, '\\\\')  // Escape backslashes first
-      .replace(/\n/g, '\\n')   // Escape newlines
-      .replace(/\r/g, '\\r');  // Escape carriage returns
-    return ': "' + escaped + '"';
-  });
+  // Fix unescaped newlines inside JSON strings using a state machine
+  // This properly handles nested quotes and escaped characters
+  let result = '';
+  let inString = false;
+  let escaped = false;
+  
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    const nextChar = cleaned[i + 1];
+    
+    if (escaped) {
+      // Previous char was a backslash, preserve this char as-is
+      result += char;
+      escaped = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      // This is an escape character
+      result += char;
+      escaped = true;
+      continue;
+    }
+    
+    if (char === '"' && !inString) {
+      // Starting a string
+      inString = true;
+      result += char;
+      continue;
+    }
+    
+    if (char === '"' && inString) {
+      // Ending a string
+      inString = false;
+      result += char;
+      continue;
+    }
+    
+    if (inString) {
+      // Inside a string - escape newlines
+      if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        result += '\\r';
+      } else if (char === '\t') {
+        result += '\\t';
+      } else {
+        result += char;
+      }
+    } else {
+      // Outside a string - keep as-is
+      result += char;
+    }
+  }
 
-  return cleaned.trim();
+  return result.trim();
 }
 
 export async function groqJson<T>(params: {
@@ -76,9 +120,13 @@ export async function groqJson<T>(params: {
       try {
         return JSON.parse(jsonText) as T;
       } catch (parseErr: any) {
-        console.error(`[DEBUG] JSON parse error at position: ${parseErr.message}`);
-        console.error(`[DEBUG] Content preview (first 300 chars): ${jsonText.slice(0, 300)}`);
-        console.error(`[DEBUG] Raw content preview (first 300 chars): ${content.slice(0, 300)}`);
+        console.error(`[DEBUG] JSON parse error: ${parseErr.message}`);
+        // Extract position from error message
+        const posMatch = parseErr.message.match(/position (\d+)/);
+        const pos = posMatch ? parseInt(posMatch[1]) : 0;
+        console.error(`[DEBUG] Error around position ${pos}:`);
+        console.error(`[DEBUG] Context: ...${jsonText.slice(Math.max(0, pos-50), pos+50)}...`);
+        console.error(`[DEBUG] Full content length: ${jsonText.length}`);
         throw parseErr;
       }
     } catch (err: any) {

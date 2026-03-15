@@ -15,6 +15,13 @@
 - [package.json](file://phase-2/package.json)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Enhanced JSON parsing reliability section with improved control character cleanup
+- Added comprehensive debugging capabilities documentation with detailed error logging
+- Updated troubleshooting guide with enhanced debugging procedures
+- Added intelligent newline escaping documentation for LLM response parsing
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -23,15 +30,17 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Dependency Analysis](#dependency-analysis)
 7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+8. [Enhanced JSON Parsing Reliability](#enhanced-json-parsing-reliability)
+9. [Comprehensive Debugging Capabilities](#comprehensive-debugging-capabilities)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
+12. [Appendices](#appendices)
 
 ## Introduction
-This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. It also covers the assignment of reviews to themes, weekly pulse generation, and safeguards against PII exposure. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
+This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. It also covers the assignment of reviews to themes, weekly pulse generation, and safeguards against PII exposure. The system now features enhanced JSON parsing reliability with improved control character cleanup, intelligent newline escaping, and comprehensive debugging capabilities with detailed error logging for troubleshooting failed API responses. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
 
 ## Project Structure
-Phase 2 builds upon Phase 1’s SQLite database and introduces new services for Groq-powered insights:
+Phase 2 builds upon Phase 1's SQLite database and introduces new services for Groq-powered insights:
 - Configuration loads environment variables for Groq API key, model, and SMTP settings.
 - Services implement theme generation, review assignment, and weekly pulse creation.
 - Validation uses Zod schemas to ensure robust parsing and shape guarantees.
@@ -73,10 +82,10 @@ SCRUB --> PULSE
 
 **Diagram sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
-- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
+- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
+- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
 - [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
@@ -86,7 +95,7 @@ SCRUB --> PULSE
 - [package.json:1-30](file://phase-2/package.json#L1-L30)
 
 ## Core Components
-- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions.
+- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions with enhanced control character cleanup and intelligent newline escaping.
 - ThemeService: Generates themes from recent reviews using structured prompts and validates outputs via Zod schemas.
 - AssignmentService: Assigns reviews to themes with confidence scores, batching requests to manage token usage.
 - PulseService: Aggregates weekly insights, generates action ideas and a concise weekly note, enforces word limits, and scrubs PII.
@@ -94,16 +103,16 @@ SCRUB --> PULSE
 - Validation: Zod schemas ensure strict typing and shape guarantees for all LLM responses.
 
 **Section sources**
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
-- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
+- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
+- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
 
 ## Architecture Overview
 The system orchestrates three primary workflows:
-- Theme Generation: Collects a sample of cleaned review texts, constructs a system and user prompt, calls Groq, extracts JSON, validates with Zod, and persists themes.
-- Review Assignment: Iterates over weekly reviews in batches, assigns each to a theme or “Other,” and persists the mapping with optional confidence.
+- Theme Generation: Collects a sample of cleaned review texts, constructs a system and user prompt, calls Groq, extracts JSON with enhanced parsing reliability, validates with Zod, and persists themes.
+- Review Assignment: Iterates over weekly reviews in batches, assigns each to a theme or "Other," and persists the mapping with optional confidence.
 - Weekly Pulse: Aggregates theme statistics for the week, selects representative quotes, generates action ideas, writes a concise note, enforces word limits, scrubs PII, and stores the result.
 
 ```mermaid
@@ -117,7 +126,7 @@ ThemeSvc->>ThemeSvc : "Build system/user prompts<br/>Define schema hint"
 ThemeSvc->>GroqCli : "Call groqJson({ system, user, schemaHint })"
 GroqCli->>GroqAPI : "chat.completions.create(model, messages)"
 GroqAPI-->>GroqCli : "Raw response text"
-GroqCli->>GroqCli : "extractJson() and parse"
+GroqCli->>GroqCli : "Enhanced extractJson() with control char cleanup<br/>Intelligent newline escaping<br/>Comprehensive debugging"
 GroqCli-->>ThemeSvc : "Parsed JSON"
 ThemeSvc->>ThemeSvc : "Zod parse and return themes"
 ThemeSvc-->>Client : "Theme array"
@@ -125,13 +134,17 @@ ThemeSvc-->>Client : "Theme array"
 
 **Diagram sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
+- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
 
 ## Detailed Component Analysis
 
 ### GroqClient Implementation
 - Initialization: Creates a Groq client only when the API key is present; otherwise returns null to prevent runtime errors.
-- JSON Extraction: Robustly extracts JSON from fenced code blocks or malformed outputs by locating braces and trimming whitespace.
+- Enhanced JSON Extraction: Robustly extracts JSON from fenced code blocks or malformed outputs by:
+  - Removing ALL control characters and non-printable characters (keeping only printable ASCII 32-126 and common whitespace)
+  - Stripping zero-width spaces and replacement characters
+  - Handling markdown code fences with intelligent fallback to brace-matching
+  - Fixing unescaped newlines inside JSON strings with intelligent escaping
 - Retry Logic: Attempts up to three times with incremental temperature increases to improve deterministic JSON output on retries.
 - Request Construction: Sends a system message and a user message that includes a strict instruction to return only valid JSON and a schema hint.
 
@@ -141,32 +154,33 @@ Start(["groqJson(params)"]) --> CheckKey["Check Groq client availability"]
 CheckKey --> |Unavailable| ThrowErr["Throw error: GROQ_API_KEY not set"]
 CheckKey --> |Available| Loop["Loop attempts 1..3"]
 Loop --> TryCall["Call chat.completions.create"]
-TryCall --> ParseResp["Extract JSON from response"]
-ParseResp --> Validate["JSON.parse()"]
+TryCall --> ParseResp["Enhanced extractJson() with:<br/>- Control char cleanup<br/>- Intelligent newline escaping<br/>- Fence stripping"]
+ParseResp --> Validate["JSON.parse() with comprehensive debugging"]
 Validate --> Success{"Parse OK?"}
 Success --> |Yes| ReturnVal["Return parsed value"]
-Success --> |No| NextAttempt["Increment attempt and increase temperature"]
+Success --> |No| DebugInfo["Log detailed error info:<br/>- Position<br/>- Content preview<br/>- Raw content preview"]
+DebugInfo --> NextAttempt["Increment attempt and increase temperature"]
 NextAttempt --> Loop
 Loop --> |Exhausted| FinalErr["Log final error and throw"]
 ```
 
 **Diagram sources**
-- [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
+- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
 
 **Section sources**
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
+- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
 
 ### Prompt Engineering Strategies
 - Role Definitions: System messages define the persona (product analyst) and constraints (no PII, concise output).
 - Instruction Formatting: User prompts include:
   - A clear directive to return only valid JSON.
-  - A schema hint to guide the model’s output structure.
+  - A schema hint to guide the model's output structure.
   - Structured context (e.g., theme lists, review samples).
 - Temperature Tuning: Slightly increasing temperature on retries improves convergence toward deterministic JSON.
 
 Examples by component:
 - Theme Generation: Builds a system role and a user prompt enumerating a sample of cleaned review texts, then requests a JSON array of themes.
-- Assignment: Provides allowed theme names and descriptions, instructs the model to assign each review to one theme or “Other,” and requests a JSON array of assignments with optional confidence.
+- Assignment: Provides allowed theme names and descriptions, instructs the model to assign each review to one theme or "Other," and requests a JSON array of assignments with optional confidence.
 - Weekly Pulse: Supplies top themes, quotes, and action ideas, and enforces a strict word limit in the note.
 
 **Section sources**
@@ -196,13 +210,13 @@ C --> |No| E["Throw validation error"]
 - [pulseService.ts:42-48](file://phase-2/src/services/pulseService.ts#L42-L48)
 
 **Section sources**
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
-- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
+- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 
 ### Theme Generation Workflow
 - Input: Reviews are sampled and cleaned; a system role defines the analyst persona and PII constraints; a user prompt enumerates review excerpts.
-- Processing: Calls groqJson with a schema hint for an array of themes.
+- Processing: Calls groqJson with a schema hint for an array of themes using enhanced JSON parsing.
 - Output: Zod-parsed themes are returned and persisted via upsert.
 
 ```mermaid
@@ -212,23 +226,23 @@ participant Groq as "groqClient"
 participant DB as "SQLite themes"
 Svc->>Svc : "Select sample reviews and build prompts"
 Svc->>Groq : "groqJson({ system, user, schemaHint })"
-Groq-->>Svc : "Parsed themes"
+Groq-->>Svc : "Enhanced parsed themes"
 Svc->>DB : "Upsert themes with timestamps and windows"
 DB-->>Svc : "IDs"
 Svc-->>Svc : "Return theme list"
 ```
 
 **Diagram sources**
-- [themeService.ts:17-56](file://phase-2/src/services/themeService.ts#L17-L56)
-- [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
+- [themeService.ts:17-49](file://phase-2/src/services/themeService.ts#L17-L49)
+- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
 - [index.ts:7-52](file://phase-2/src/db/index.ts#L7-L52)
 
 **Section sources**
-- [themeService.ts:17-56](file://phase-2/src/services/themeService.ts#L17-L56)
+- [themeService.ts:17-49](file://phase-2/src/services/themeService.ts#L17-L49)
 
 ### Review Assignment to Themes
 - Input: Weekly reviews and latest themes.
-- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson, parses assignments, and persists mappings with optional confidence.
+- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson with enhanced parsing, parses assignments, and persists mappings with optional confidence.
 - Persistence: Uses an upsert to update confidence values for repeated runs.
 
 ```mermaid
@@ -241,7 +255,7 @@ Repo-->>Asgn : "List reviews for week"
 Asgn->>Asgn : "Load latest themes"
 loop "Batch over reviews"
 Asgn->>Groq : "groqJson({ system, user, schemaHint })"
-Groq-->>Asgn : "Assignments"
+Groq-->>Asgn : "Enhanced assignments"
 Asgn->>DB : "Upsert review_theme with confidence"
 end
 Asgn-->>Repo : "Stats (assigned/skipped/themes)"
@@ -249,11 +263,11 @@ Asgn-->>Repo : "Stats (assigned/skipped/themes)"
 
 **Diagram sources**
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
-- [assignmentService.ts:27-97](file://phase-2/src/services/assignmentService.ts#L27-L97)
+- [assignmentService.ts:31-71](file://phase-2/src/services/assignmentService.ts#L31-L71)
 - [index.ts:24-33](file://phase-2/src/db/index.ts#L24-L33)
 
 **Section sources**
-- [assignmentService.ts:27-97](file://phase-2/src/services/assignmentService.ts#L27-L97)
+- [assignmentService.ts:31-71](file://phase-2/src/services/assignmentService.ts#L31-L71)
 
 ### Weekly Pulse Generation
 - Inputs: Top themes, selected quotes, and generated action ideas.
@@ -271,7 +285,7 @@ Pulse->>Pulse : "Pick quotes per theme"
 Pulse->>Groq : "generateActionIdeas()"
 Groq-->>Pulse : "Action ideas"
 Pulse->>Groq : "generateWeeklyNote() with word limit"
-Groq-->>Pulse : "Note (may retry if over limit)"
+Groq-->>Pulse : "Enhanced note (may retry if over limit)"
 Pulse->>Scrub : "scrubPii(note)"
 Scrub-->>Pulse : "PII-free note"
 Pulse->>DB : "Insert weekly pulse record"
@@ -280,11 +294,11 @@ Pulse-->>Pulse : "Return WeeklyPulse"
 ```
 
 **Diagram sources**
-- [pulseService.ts:109-241](file://phase-2/src/services/pulseService.ts#L109-L241)
+- [pulseService.ts:109-172](file://phase-2/src/services/pulseService.ts#L109-L172)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
 
 **Section sources**
-- [pulseService.ts:109-241](file://phase-2/src/services/pulseService.ts#L109-L241)
+- [pulseService.ts:109-172](file://phase-2/src/services/pulseService.ts#L109-L172)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
 
 ### Data Models and Persistence
@@ -376,15 +390,91 @@ PULSE --> SCRUB["piiScrubber.ts"]
   - Choose appropriate models and tune temperature to balance quality and cost.
   - Monitor output length (word count) to avoid unnecessary tokens.
 
-[No sources needed since this section provides general guidance]
+## Enhanced JSON Parsing Reliability
+
+**Updated** The GroqClient now features significantly enhanced JSON parsing reliability with comprehensive control character cleanup and intelligent newline escaping mechanisms.
+
+### Control Character Cleanup
+The enhanced `extractJson` function implements aggressive control character removal:
+- Removes ALL control characters (ASCII 0-8, 11, 12, 14-31, 127-159)
+- Strips zero-width spaces and invisible Unicode characters
+- Eliminates replacement characters that break JSON parsing
+- Preserves only printable ASCII characters (32-126) and common whitespace
+
+### Intelligent Newline Escaping
+Addresses a common LLM issue where unescaped newlines within JSON string values cause parsing failures:
+- Identifies string values within JSON using regex patterns
+- Escapes actual newlines (`\n`) and carriage returns (`\r`) with proper JSON escape sequences
+- Handles backslash escaping precedence to prevent double-escaping issues
+- Maintains original string content while ensuring JSON compliance
+
+### Markdown Fence Handling
+Implements intelligent markdown code fence detection and extraction:
+- Supports both ```json and ``` syntax variations
+- Extracts content between fences while removing surrounding formatting
+- Falls back to brace-matching algorithm when fences are absent
+- Trims whitespace while preserving structural integrity
+
+**Section sources**
+- [groqClient.ts:14-47](file://phase-2/src/services/groqClient.ts#L14-L47)
+
+## Comprehensive Debugging Capabilities
+
+**Updated** The GroqClient now provides extensive debugging capabilities with detailed error logging for troubleshooting failed API responses.
+
+### Detailed Error Logging
+The enhanced error handling system provides comprehensive debugging information:
+- Logs JSON parse error positions with precise character locations
+- Captures content previews (first 300 characters) for immediate diagnosis
+- Records raw content previews to compare with processed output
+- Includes retry attempt information for sequential debugging
+
+### Debug Information Structure
+When JSON parsing fails, the system logs:
+- `[DEBUG] JSON parse error at position: <error_message>`
+- `[DEBUG] Content preview (first 300 chars): <processed_json_preview>`
+- `[DEBUG] Raw content preview (first 300 chars): <raw_api_response_preview>`
+
+### Error Recovery Flow
+The debugging-enabled retry mechanism:
+- Attempts up to three parsing attempts with incremental temperature increases
+- Logs detailed information on each failure for systematic troubleshooting
+- Provides comprehensive context for developers to identify root causes
+- Maintains error propagation while preserving diagnostic information
+
+**Section sources**
+- [groqClient.ts:75-83](file://phase-2/src/services/groqClient.ts#L75-L83)
+
+## Performance Considerations
+- Token Management:
+  - Batch processing: AssignmentService processes reviews in fixed-size batches to control token consumption per request.
+  - Prompt minimization: Use concise theme lists and truncated review excerpts to reduce input size.
+- Retry Strategy:
+  - Incremental temperature on retries improves determinism for JSON parsing.
+  - Limit retries to avoid excessive latency and cost.
+- Caching and Deduplication:
+  - Reuse latest themes to minimize repeated generation.
+  - Avoid regenerating weekly pulses for the same week_start/version.
+- Database Efficiency:
+  - Use upserts and transactions to reduce round-trips.
+  - Leverage indexes on foreign keys and uniqueness constraints.
+- Cost Control:
+  - Choose appropriate models and tune temperature to balance quality and cost.
+  - Monitor output length (word count) to avoid unnecessary tokens.
 
 ## Troubleshooting Guide
 - Missing API Key:
   - Symptom: Error indicating the Groq API key is not set.
   - Resolution: Set GROQ_API_KEY in the environment file and restart the service.
-- JSON Parsing Failures:
-  - Symptom: Validation errors or groqJson throwing after retries.
-  - Resolution: Strengthen schema hints, enforce stricter instructions in prompts, and verify model consistency.
+- Enhanced JSON Parsing Failures:
+  - Symptom: Validation errors or groqJson throwing after retries with detailed debug logs.
+  - Resolution: Check the debug logs for error positions and content previews; strengthen schema hints, enforce stricter instructions in prompts, and verify model consistency.
+- Control Character Issues:
+  - Symptom: JSON parsing errors due to invisible characters or special Unicode.
+  - Resolution: The enhanced parser automatically removes control characters; verify that the raw content preview shows clean JSON output.
+- Newline Escaping Problems:
+  - Symptom: String values containing actual newlines causing parsing failures.
+  - Resolution: The intelligent newline escaping mechanism automatically handles this; check debug logs to confirm proper escaping.
 - Over-limit Outputs:
   - Symptom: Weekly note exceeds word count.
   - Resolution: Use the built-in retry with a stricter prompt; optionally shorten theme/quote summaries.
@@ -396,14 +486,12 @@ PULSE --> SCRUB["piiScrubber.ts"]
   - Resolution: Trigger theme generation first; ensure weekly assignment runs after theme generation.
 
 **Section sources**
-- [groqClient.ts:35-65](file://phase-2/src/services/groqClient.ts#L35-L65)
+- [groqClient.ts:54-92](file://phase-2/src/services/groqClient.ts#L54-L92)
 - [pulseService.ts:162-171](file://phase-2/src/services/pulseService.ts#L162-L171)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
 
 ## Conclusion
-Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
-
-[No sources needed since this section summarizes without analyzing specific files]
+Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation with significantly enhanced JSON parsing reliability. The system now features comprehensive control character cleanup, intelligent newline escaping, and detailed debugging capabilities with comprehensive error logging. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
 
 ## Appendices
 
@@ -441,3 +529,12 @@ Phase 2 integrates Groq to power theme generation, review assignment, and weekly
 **Section sources**
 - [schema.test.ts:1-10](file://phase-2/src/tests/schema.test.ts#L1-L10)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
+
+### Enhanced Debugging Procedures
+- Enable Debug Mode: The system automatically logs detailed information on JSON parsing failures.
+- Analyze Error Positions: Use the logged character positions to identify problematic JSON segments.
+- Compare Content Previews: Examine both processed and raw content previews to understand transformation effects.
+- Monitor Retry Attempts: Track sequential failures to identify persistent issues.
+
+**Section sources**
+- [groqClient.ts:75-83](file://phase-2/src/services/groqClient.ts#L75-L83)
