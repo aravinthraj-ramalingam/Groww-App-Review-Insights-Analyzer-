@@ -27,12 +27,12 @@
 
 ## Update Summary
 **Changes Made**
-- Migrated all database operations to PostgreSQL using a unified adapter pattern
-- Converted getWeekThemeStats, pickQuotes, and generatePulse functions to use async/await with proper transaction handling
-- Implemented PostgreSQL connection pooling with SSL configuration for production environments
-- Added comprehensive schema initialization and migration utilities
-- Enhanced database abstraction layer with transaction support for both SQLite and PostgreSQL
-- Updated all service functions to work seamlessly with the new database backend
+- Enhanced theme deduplication logic with case-insensitive comparison in pulseService.ts
+- Improved version handling with automatic increment and duplicate prevention
+- Better fallback mechanisms when no theme assignments exist
+- Refined theme filtering and duplicate prevention throughout the system
+- Enhanced PostgreSQL connectivity with unified database adapter pattern
+- Added comprehensive theme cleanup utilities for data integrity maintenance
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -50,18 +50,19 @@
 ## Introduction
 This document describes the sophisticated weekly pulse generation system that transforms raw app store reviews into curated, actionable insights. The system orchestrates a comprehensive weekly insights pipeline that combines theme analysis with user feedback to generate actionable recommendations. It covers the complete lifecycle from assigned themes to aggregated insights, including sentiment-aware aggregation, LLM-powered note generation, robust content formatting (HTML and plain text), validation and quality assurance, performance optimization for weekly batch processing, and delivery tracking. The system provides practical examples, customization options, and comprehensive error recovery strategies.
 
-**Updated** Enhanced with PostgreSQL connectivity and unified database adapter pattern that supports both SQLite and PostgreSQL backends with seamless migration capabilities.
+**Updated** Enhanced with PostgreSQL connectivity and unified database adapter pattern that supports both SQLite and PostgreSQL backends with seamless migration capabilities. **Refined with improved theme deduplication logic, enhanced version handling, and better fallback mechanisms for duplicate prevention and data integrity**.
 
 ## Project Structure
 The weekly pulse system resides in phase-2 and orchestrates multiple sophisticated services with PostgreSQL connectivity:
 - Advanced theme generation and persistence with configurable windows and deduplication
 - Intelligent review-to-theme assignment with batching and confidence scoring
-- Sophisticated weekly pulse aggregation with sentiment analysis, recommendation generation, and unique theme selection
+- Sophisticated weekly pulse aggregation with sentiment analysis, recommendation generation, and **enhanced unique theme selection logic**
 - Enhanced email rendering with PII scrubbing and dual-format delivery
 - Automated scheduler with delivery tracking and retry mechanisms
 - Unified database adapter supporting both SQLite and PostgreSQL backends
 - Comprehensive PostgreSQL schema with connection pooling and SSL configuration
-- Theme cleanup utilities for maintaining data integrity
+- Theme cleanup utilities for maintaining data integrity through duplicate detection and removal
+- **Improved version management with automatic increment and duplicate prevention**
 
 ```mermaid
 graph TB
@@ -80,7 +81,7 @@ end
 subgraph "Service Layer"
 THEME["themeService.ts<br/>Advanced Theme Generation<br/>Deduplication Logic"]
 ASSIGN["assignmentService.ts<br/>Intelligent Assignment"]
-PULSE["pulseService.ts<br/>Sophisticated Pulse Generation<br/>Async/Await Pattern"]
+PULSE["pulseService.ts<br/>Sophisticated Pulse Generation<br/>Enhanced Deduplication<br/>Version Management"]
 EMAIL["emailService.ts<br/>Enhanced Email Delivery"]
 PREFS["userPrefsRepo.ts<br/>Preference Management"]
 GROQ["groqClient.ts<br/>LLM Orchestration"]
@@ -125,11 +126,11 @@ SCHED --> PREFS
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
 - [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
-- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [postgres.ts:1-150](file://phase-2/src/db/postgres.ts#L1-L150)
 - [db/index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
-- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
+- [themeService.ts:1-88](file://phase-2/src/services/themeService.ts#L1-L88)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
+- [pulseService.ts:1-277](file://phase-2/src/services/pulseService.ts#L1-L277)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
@@ -147,7 +148,7 @@ SCHED --> PREFS
 ## Core Components
 - **Advanced Theme Service**: Generates sophisticated themes from sampled reviews with configurable validity windows, using LLMs with strict schema validation and cost-controlled text sampling. **Enhanced with case-insensitive deduplication to ensure unique theme names**.
 - **Intelligent Assignment Service**: Performs batched review-to-theme assignment with confidence scoring, supporting "Other" category fallback and bulk persistence with conflict resolution
-- **Sophisticated Pulse Service**: Orchestrates comprehensive weekly pulse generation with sentiment-aware aggregation, representative quote selection, LLM-powered action recommendations, strict quality controls, and **unique theme selection logic to prevent duplicate theme names**
+- **Sophisticated Pulse Service**: Orchestrates comprehensive weekly pulse generation with sentiment-aware aggregation, representative quote selection, LLM-powered action recommendations, strict quality controls, and **enhanced unique theme selection logic to prevent duplicate theme names**. **Improved version handling with automatic increment and duplicate prevention**.
 - **Enhanced Email Service**: Renders responsive HTML and plain-text emails with comprehensive PII scrubbing, dual-format delivery, and subject line customization
 - **Automated Scheduler**: Manages weekly pulse generation with due preference detection, job scheduling, retry mechanisms, and comprehensive delivery tracking
 - **Preference Management**: Handles user preferences with timezone support, preferred send times, and active preference maintenance
@@ -159,26 +160,26 @@ SCHED --> PREFS
 - **PostgreSQL Connection Pool**: **New component managing connection pooling, SSL configuration, and schema initialization for production deployments**
 
 **Section sources**
-- [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
-- [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
+- [themeService.ts:18-50](file://phase-2/src/services/themeService.ts#L18-L50)
+- [assignmentService.ts:31-114](file://phase-2/src/services/assignmentService.ts#L31-L114)
+- [pulseService.ts:178-252](file://phase-2/src/services/pulseService.ts#L178-252)
 - [emailService.ts:9-95](file://phase-2/src/services/emailService.ts#L9-L95)
-- [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
+- [schedulerJob.ts:53-85](file://phase-2/src/jobs/schedulerJob.ts#L53-L85)
 - [userPrefsRepo.ts:21-56](file://phase-2/src/services/userPrefsRepo.ts#L21-L56)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [piiScrubber.ts:22-28](file://phase-2/src/services/piiScrubber.ts#L22-L28)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 - [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
-- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [postgres.ts:1-150](file://phase-2/src/db/postgres.ts#L1-L150)
 
 ## Architecture Overview
-The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation with unique theme selection, and automated delivery with tracking. **The architecture now supports both SQLite and PostgreSQL backends through a unified adapter pattern with automatic migration capabilities**.
+The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation with enhanced unique theme selection, and automated delivery with tracking. **The architecture now supports both SQLite and PostgreSQL backends through a unified adapter pattern with automatic migration capabilities**.
 
 ```mermaid
 sequenceDiagram
 participant Cron as "Scheduler<br/>Automated Execution"
 participant Pref as "Preferences<br/>User Management"
-participant Gen as "Pulse Service<br/>Insight Generation"
+participant Gen as "Pulse Service<br/>Enhanced Insight Generation"
 participant Repo as "Reviews Repo<br/>Data Access"
 participant Theme as "Theme Service<br/>Analysis"
 participant Assign as "Assignment Service<br/>Classification"
@@ -193,8 +194,8 @@ Cron->>Gen : generatePulse(weekStart)<br/>Initiate pulse generation
 Note over Gen,DB : Theme Analysis Phase
 Gen->>Theme : listLatestThemes(5)<br/>Load current themes
 Theme->>DB : SELECT themes<br/>Fetch theme definitions
-Note over Gen,DB : Unique Theme Deduplication
-Gen->>Gen : Filter unique themes by name<br/>Case-insensitive comparison
+Note over Gen,DB : Enhanced Unique Theme Deduplication
+Gen->>Gen : Filter unique themes by name<br/>Case-insensitive comparison<br/>Trim whitespace
 Note over Gen,DB : Assignment Phase
 Gen->>Repo : listReviewsForWeek(weekStart)<br/>Get weekly reviews
 Repo->>DB : SELECT reviews<br/>Load review data
@@ -202,14 +203,14 @@ Gen->>Assign : assignReviewsToThemes(reviews, themes)<br/>Classify reviews
 Assign->>LLM : chat completions<br/>Batched LLM processing
 LLM-->>Assign : assignments<br/>Theme classifications
 Assign->>DB : INSERT ... ON CONFLICT<br/>Persist assignments
-Note over Gen,DB : Pulse Generation Phase
+Note over Gen,DB : Enhanced Pulse Generation Phase
 Gen->>LLM : generateActionIdeas<br/>Generate recommendations
 LLM-->>Gen : action_ideas<br/>Actionable suggestions
 Gen->>LLM : generateWeeklyNote<br/>Create weekly summary
 LLM-->>Gen : note_body<br/>Structured insights
-Note over Gen,DB : Quality Assurance
+Note over Gen,DB : Enhanced Quality Assurance
 Gen->>DB : INSERT weekly_pulses<br/>Store pulse with validation
-Gen->>DB : Version increment<br/>Handle duplicates
+Gen->>DB : Version increment<br/>Handle duplicates automatically
 Note over Cron,DB : Delivery Phase
 Cron->>Mail : sendPulseEmail(to, pulse)<br/>Send insights
 Mail->>DB : scrub + render<br/>PII protection & formatting
@@ -219,9 +220,9 @@ end
 ```
 
 **Diagram sources**
-- [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
-- [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
-- [assignmentService.ts:27-97](file://phase-2/src/services/assignmentService.ts#L27-L97)
+- [schedulerJob.ts:53-85](file://phase-2/src/jobs/schedulerJob.ts#L53-L85)
+- [pulseService.ts:178-252](file://phase-2/src/services/pulseService.ts#L178-252)
+- [assignmentService.ts:31-114](file://phase-2/src/services/assignmentService.ts#L31-L114)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
@@ -238,20 +239,20 @@ Start(["Theme Generation Start"]) --> Sample["Sample Recent Reviews<br/>Truncate
 Sample --> Prompt["Build System & User Prompts<br/>Strict Schema Requirements<br/>Unique Name Constraint"]
 Prompt --> CallLLM["groqJson<br/>JSON Extraction & Validation"]
 CallLLM --> Parse["Zod Schema Validation<br/>Length & Format Checks"]
-Parse --> Dedup["Case-Insensitive Deduplication<br/>Remove Duplicate Names"]
+Parse --> Dedup["Case-Insensitive Deduplication<br/>Remove Duplicate Names<br/>Trim Whitespace"]
 Dedup --> Window["Apply Validity Windows<br/>Configurable Time Frames"]
 Window --> Upsert["Bulk Upsert Themes<br/>Unique Constraints"]
 Upsert --> End(["Theme Generation Complete"])
 ```
 
 **Diagram sources**
-- [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [themeService.ts:39-48](file://phase-2/src/services/themeService.ts#L39-L48)
+- [themeService.ts:18-50](file://phase-2/src/services/themeService.ts#L18-L50)
+- [themeService.ts:52-75](file://phase-2/src/services/themeService.ts#L52-L75)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 
 **Section sources**
-- [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [themeService.ts:39-48](file://phase-2/src/services/themeService.ts#L39-L48)
+- [themeService.ts:18-50](file://phase-2/src/services/themeService.ts#L18-L50)
+- [themeService.ts:52-75](file://phase-2/src/services/themeService.ts#L52-L75)
 
 ### Intelligent Review-to-Theme Assignment
 The assignment system implements advanced batch processing with confidence scoring and intelligent fallback mechanisms. Reviews are processed in controlled batches to manage token usage while maintaining accuracy through schema enforcement and conflict resolution.
@@ -274,17 +275,16 @@ DB-->>Assign : persisted counts<br/>Transaction results
 ```
 
 **Diagram sources**
-- [assignmentService.ts:27-97](file://phase-2/src/services/assignmentService.ts#L27-L97)
+- [assignmentService.ts:31-114](file://phase-2/src/services/assignmentService.ts#L31-L114)
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
-- [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
-- [assignmentService.ts:73-97](file://phase-2/src/services/assignmentService.ts#L73-L97)
+- [assignmentService.ts:31-114](file://phase-2/src/services/assignmentService.ts#L31-L114)
 
 ### Sophisticated Weekly Pulse Aggregation and Generation
-The pulse generation system implements comprehensive aggregation with sentiment-aware analysis, representative quote selection, and LLM-powered recommendation generation. **Enhanced with unique theme selection logic to prevent duplicate theme names and improved fallback mechanisms**.
+The pulse generation system implements comprehensive aggregation with sentiment-aware analysis, representative quote selection, and LLM-powered recommendation generation. **Enhanced with improved unique theme selection logic to prevent duplicate theme names and better fallback mechanisms**. **Improved version handling with automatic increment and duplicate prevention**.
 
 ```mermaid
 flowchart TD
@@ -296,14 +296,14 @@ AltCheck{"Assignments Exist?"}
 Top3 --> AltCheck
 AltCheck --> |Yes| Effective["Use Actual Theme Stats"]
 AltCheck --> |No| Fallback["Fallback to Latest Themes<br/>Zero Counts"]
-Effective --> Unique["Filter Unique Themes by Name<br/>Case-insensitive Deduplication"]
+Effective --> Unique["Filter Unique Themes by Name<br/>Case-insensitive Deduplication<br/>Trim Whitespace"]
 Fallback --> Unique
 Unique --> Quotes["pickQuotes<br/>Select Representative Quotes<br/>PII-Free & Distinct"]
 Quotes --> Ideas["generateActionIdeas<br/>3 Concise Recommendations<br/>Grounded in Themes & Quotes"]
 Quotes --> Note["generateWeeklyNote<br/>Strict Word Limits<br/>Retry Mechanism"]
 Ideas --> Note
 Note --> Scrub["scrubPii<br/>Final PII Protection"]
-Scrub --> Version["Version Management<br/>Increment if Duplicate"]
+Scrub --> Version["Enhanced Version Management<br/>Auto-increment for duplicates"]
 Version --> Save["INSERT weekly_pulses<br/>JSON Serialization"]
 Save --> End(["Weekly Pulse Generated"])
 ```
@@ -311,18 +311,17 @@ Save --> End(["Weekly Pulse Generated"])
 **Diagram sources**
 - [pulseService.ts:59-74](file://phase-2/src/services/pulseService.ts#L59-L74)
 - [pulseService.ts:79-105](file://phase-2/src/services/pulseService.ts#L79-L105)
-- [pulseService.ts:109-132](file://phase-2/src/services/pulseService.ts#L109-L132)
-- [pulseService.ts:134-172](file://phase-2/src/services/pulseService.ts#L134-L172)
-- [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
-- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+- [pulseService.ts:109-172](file://phase-2/src/services/pulseService.ts#L109-L172)
+- [pulseService.ts:178-252](file://phase-2/src/services/pulseService.ts#L178-252)
+- [pulseService.ts:226-252](file://phase-2/src/services/pulseService.ts#L226-L252)
 - [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
 - [pulseService.ts:59-74](file://phase-2/src/services/pulseService.ts#L59-L74)
 - [pulseService.ts:79-105](file://phase-2/src/services/pulseService.ts#L79-L105)
 - [pulseService.ts:109-172](file://phase-2/src/services/pulseService.ts#L109-L172)
-- [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
-- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+- [pulseService.ts:178-252](file://phase-2/src/services/pulseService.ts#L178-L252)
+- [pulseService.ts:226-252](file://phase-2/src/services/pulseService.ts#L226-L252)
 
 ### Enhanced Content Formatting and Delivery
 The email system provides comprehensive dual-format delivery with sophisticated HTML rendering and plain-text alternatives. The system implements robust PII scrubbing and responsive design for optimal user experience.
@@ -362,7 +361,7 @@ The scheduler implements sophisticated automation with due preference detection,
 sequenceDiagram
 participant Tick as "runSchedulerOnce<br/>Execution Loop"
 participant Pref as "listDuePrefs<br/>Preference Management"
-participant Gen as "generatePulse<br/>Insight Generation"
+participant Gen as "generatePulse<br/>Enhanced Insight Generation"
 participant Mail as "sendPulseEmail<br/>Delivery"
 participant DB as "scheduled_jobs<br/>Tracking"
 Tick->>Pref : listDuePrefs(now)<br/>Find Due Recipients
@@ -383,16 +382,16 @@ end
 ```
 
 **Diagram sources**
-- [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
+- [schedulerJob.ts:53-85](file://phase-2/src/jobs/schedulerJob.ts#L53-L85)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
 - [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
-- [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
+- [schedulerJob.ts:53-85](file://phase-2/src/jobs/schedulerJob.ts#L53-L85)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
 
-### Theme Integrity Maintenance
-**New Component**: The theme cleanup utility provides automated maintenance of theme data integrity by detecting and removing duplicate theme names while preserving the most recent versions.
+### Enhanced Theme Integrity Maintenance
+**New Component**: The theme cleanup utility provides automated maintenance of theme data integrity by detecting and removing duplicate theme names while preserving the most recent versions. **Enhanced with improved duplicate detection and removal logic**.
 
 ```mermaid
 flowchart TD
@@ -522,11 +521,11 @@ InitSchema --> Ready["Ready for Operations<br/>Connection Pool Active"]
 
 **Diagram sources**
 - [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
-- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
+- [postgres.ts:27-139](file://phase-2/src/db/postgres.ts#L27-L139)
 
 **Section sources**
 - [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
-- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [postgres.ts:1-150](file://phase-2/src/db/postgres.ts#L1-L150)
 
 ### SQLite to PostgreSQL Migration
 **New Component**: The migration utility provides automated data transfer from SQLite to PostgreSQL with conflict resolution and schema preservation.
@@ -559,10 +558,11 @@ The system demonstrates excellent architectural principles with strong cohesion 
 - **Resilience**: Comprehensive retry mechanisms, error handling, and graceful degradation strategies
 - **Data Integrity**: **Enhanced with theme cleanup utilities, deduplication logic, and unified database adapter for consistent data quality**
 - **Backend Flexibility**: **New unified adapter pattern supports seamless migration between SQLite and PostgreSQL**
+- **Version Management**: **Enhanced with automatic version increment and duplicate prevention mechanisms**
 
 ```mermaid
 graph LR
-G["groqClient.ts<br/>LLM Orchestration"] --> P["pulseService.ts<br/>Insight Generation"]
+G["groqClient.ts<br/>LLM Orchestration"] --> P["pulseService.ts<br/>Enhanced Insight Generation"]
 G --> A["assignmentService.ts<br/>Review Classification"]
 G --> T["themeService.ts<br/>Theme Analysis"]
 E["emailService.ts<br/>Email Delivery"] --> S["piiScrubber.ts<br/>PII Protection"]
@@ -583,23 +583,23 @@ M["migrateToPostgres.ts<br/>Migration Utility"] --> PG
 
 **Diagram sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
-- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
+- [pulseService.ts:1-277](file://phase-2/src/services/pulseService.ts#L1-L277)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
+- [themeService.ts:1-88](file://phase-2/src/services/themeService.ts#L1-L88)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [piiScrubber.ts:1-29](file://phase-2/src/services/piiScrubber.ts#L1-L29)
 - [schedulerJob.ts:1-99](file://phase-2/src/jobs/schedulerJob.ts#L1-L99)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
 - [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
-- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [postgres.ts:1-150](file://phase-2/src/db/postgres.ts#L1-L150)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
 - [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 **Section sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
 - [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
-- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [postgres.ts:1-150](file://phase-2/src/db/postgres.ts#L1-L150)
 
 ## Performance Considerations
 The system implements comprehensive performance optimizations designed for weekly batch processing scenarios:
@@ -610,9 +610,10 @@ The system implements comprehensive performance optimizations designed for weekl
 - **Retry Strategy**: Progressive backoff with increasing temperature improves JSON extraction reliability and reduces API failures
 - **Concurrency Control**: Sequential processing per scheduler tick prevents resource contention while allowing for horizontal scaling
 - **Caching Strategy**: Theme caching and review batching minimize redundant database queries and LLM calls
-- **Deduplication Efficiency**: **Case-insensitive deduplication uses Set-based lookups for O(n) performance in theme name filtering**
+- **Enhanced Deduplication Efficiency**: **Case-insensitive deduplication uses Set-based lookups for O(n) performance in theme name filtering with whitespace trimming**
 - **Connection Pooling**: **PostgreSQL connection pooling with SSL configuration optimizes database connections for production deployments**
 - **Placeholder Conversion**: **Automatic SQL placeholder conversion eliminates backend-specific query differences and improves maintainability**
+- **Version Management**: **Automatic version increment prevents duplicate pulses and ensures data integrity during concurrent processing**
 
 ## Troubleshooting Guide
 Comprehensive troubleshooting guidance for common operational issues:
@@ -631,8 +632,8 @@ Comprehensive troubleshooting guidance for common operational issues:
 **Pulse Generation Failures**
 - Missing assignments: Confirm assignment process completed successfully before pulse generation
 - Quality validation errors: Check word count limits, schema validation, and PII scrubbing effectiveness
-- Version conflicts: Monitor for concurrent pulse generation attempts and handle duplicate detection
-- **Duplicate theme names in top themes**: The deduplication logic automatically removes duplicates, but verify the effectiveTopThemes array contains unique entries
+- **Enhanced version conflicts**: Monitor for concurrent pulse generation attempts and handle duplicate detection automatically
+- **Duplicate theme names in top themes**: The enhanced deduplication logic automatically removes duplicates with case-insensitive comparison and whitespace trimming
 
 **Delivery and Tracking Issues**
 - SMTP configuration errors: Verify host, port, username, and password settings in environment variables
@@ -647,12 +648,17 @@ Comprehensive troubleshooting guidance for common operational issues:
 
 **Theme Integrity Issues**
 - **Duplicate themes detected**: Run the cleanupDuplicateThemes script to resolve naming conflicts
-- **Case sensitivity problems**: The deduplication logic handles case-insensitive comparisons automatically
+- **Case sensitivity problems**: The enhanced deduplication logic handles case-insensitive comparisons automatically with whitespace trimming
 - **Theme name conflicts**: Use the unique themes filtering to ensure no duplicate names in pulse generation
+
+**Enhanced Version Management Issues**
+- **Version conflicts**: The system automatically increments versions to prevent duplicate pulses
+- **Duplicate prevention**: Automatic version handling ensures unique pulse entries for the same week
+- **Data integrity**: Enhanced version management prevents data corruption during concurrent processing
 
 **Section sources**
 - [pulseService.ts:180-188](file://phase-2/src/services/pulseService.ts#L180-L188)
-- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+- [pulseService.ts:226-252](file://phase-2/src/services/pulseService.ts#L226-L252)
 - [groqClient.ts:35-65](file://phase-2/src/services/groqClient.ts#L35-L65)
 - [emailService.ts:99-102](file://phase-2/src/services/emailService.ts#L99-L102)
 - [schedulerJob.ts:75-80](file://phase-2/src/jobs/schedulerJob.ts#L75-L80)
@@ -661,22 +667,22 @@ Comprehensive troubleshooting guidance for common operational issues:
 - [migrateToPostgres.ts:104-107](file://phase-2/scripts/migrateToPostgres.ts#L104-L107)
 
 ## Conclusion
-The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. **The addition of PostgreSQL connectivity through a unified database adapter enables seamless deployment in production environments with connection pooling and SSL configuration**. **The system now supports both SQLite for development and PostgreSQL for production with automatic migration capabilities**. **The addition of deduplication logic ensures unique themes are selected for pulse creation, preventing duplicate theme names in top themes lists and improving data quality**. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
+The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. **The addition of PostgreSQL connectivity through a unified database adapter enables seamless deployment in production environments with connection pooling and SSL configuration**. **The system now supports both SQLite for development and PostgreSQL for production with automatic migration capabilities**. **The enhanced deduplication logic ensures unique themes are selected for pulse creation, preventing duplicate theme names in top themes lists and improving data quality**. **The improved version handling provides automatic duplicate prevention and data integrity management**. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
 
 ## Appendices
 
 ### Example Scenarios
-**New Theme Cycle Implementation**
+**Enhanced Theme Cycle Implementation**
 - Execute theme generation from recent reviews with configurable validity windows
-- **Case-insensitive deduplication removes duplicate theme names automatically**
+- **Case-insensitive deduplication removes duplicate theme names automatically with whitespace trimming**
 - Upsert themes into the database with timestamp tracking
 - Process subsequent assignment and pulse generation cycles automatically
 
 **Empty Week Handling Strategy**
 - Graceful fallback to latest themes with zero counts when no assignments exist
-- **Unique themes filtering ensures no duplicate names even with fallback**
+- **Enhanced unique themes filtering ensures no duplicate names even with fallback**
 - Maintains pulse generation continuity even during low-volume periods
-- Preserves historical context through version management
+- Preserves historical context through enhanced version management
 
 **Template Customization Options**
 - Modify HTML template structure while preserving essential sections
@@ -688,20 +694,22 @@ The enhanced weekly pulse generation system represents a sophisticated solution 
 - Implement flexible scheduling based on business requirements
 - Support multiple recipients with individualized delivery preferences
 
-**Theme Integrity Maintenance**
+**Enhanced Theme Integrity Maintenance**
 - **Run cleanupDuplicateThemes script to remove duplicate theme names**
-- **Monitor for case-sensitive duplicates using the deduplication logic**
+- **Monitor for case-sensitive duplicates using the enhanced deduplication logic**
 - **Prevent theme name conflicts before pulse generation begins**
+- **Automatic whitespace trimming prevents formatting-related duplicates**
 
-**PostgreSQL Deployment**
+**Enhanced PostgreSQL Deployment**
 - **Set DATABASE_URL environment variable for PostgreSQL connectivity**
 - **Use connection pooling with SSL configuration for production deployments**
 - **Run migration script to transfer data from SQLite to PostgreSQL**
 - **Monitor connection pool health and performance metrics**
+- **Automatic version handling prevents duplicate pulses during migration**
 
 **Section sources**
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
-- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+- [pulseService.ts:226-252](file://phase-2/src/services/pulseService.ts#L226-L252)
 - [emailService.ts:9-62](file://phase-2/src/services/emailService.ts#L9-L62)
 - [userPrefsRepo.ts:62-77](file://phase-2/src/services/userPrefsRepo.ts#L62-L77)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
@@ -717,21 +725,23 @@ The system implements comprehensive validation mechanisms ensuring data integrit
 - Assignment results verified for completeness and confidence scoring
 - Output validation ensures pulse structure and content quality
 
-**Quality Control Measures**
+**Enhanced Quality Control Measures**
 - Word count enforcement with automatic retry for weekly notes exceeding limits
 - PII scrubbing applied as final safety pass before storage and delivery
 - Confidence threshold validation for assignment accuracy
-- Duplicate detection and version management for pulse consistency
-- **Case-insensitive theme name deduplication prevents duplicate entries in top themes**
+- **Enhanced duplicate detection and version management for pulse consistency**
+- **Case-insensitive theme name deduplication prevents duplicate entries in top themes with whitespace trimming**
 - **PostgreSQL schema validation ensures table integrity and proper indexing**
+- **Automatic version increment prevents duplicate pulses for the same week**
 
 **Testing Framework**
 - Unit tests covering PII redaction effectiveness and content sanitization
 - Word count validation testing for note generation limits
 - Email content testing for HTML and plain-text formatting accuracy
 - Assignment persistence testing with database constraint validation
-- **Theme deduplication testing for unique name filtering**
+- **Enhanced theme deduplication testing for unique name filtering with case-insensitive comparison**
 - **Database adapter testing for backend switching and transaction handling**
+- **Version management testing for duplicate prevention and data integrity**
 
 **Section sources**
 - [pulseService.ts:42-48](file://phase-2/src/services/pulseService.ts#L42-L48)
@@ -765,13 +775,15 @@ Critical configuration requirements for system operation:
 - [env.ts:9-21](file://phase-2/src/config/env.ts#L9-L21)
 - [postgres.ts:8-18](file://phase-2/src/db/postgres.ts#L8-L18)
 
-### Deduplication Implementation Details
-**Enhanced Component**: The deduplication logic in pulseService.ts ensures unique themes are selected for weekly pulse generation:
+### Enhanced Deduplication Implementation Details
+**Enhanced Component**: The deduplication logic in pulseService.ts ensures unique themes are selected for weekly pulse generation with improved case-insensitive comparison:
 
 ```typescript
-// Ensure unique themes by name
-const uniqueThemes = themes.filter((t, index, self) => 
-  index === self.findIndex((tt) => tt.name === t.name)
+// Enhanced deduplication with case-insensitive comparison and whitespace trimming
+const uniqueThemeStats = themeStats.filter((t, index, self) => 
+  index === self.findIndex((tt) => 
+    tt.name.toLowerCase().trim() === t.name.toLowerCase().trim()
+  )
 );
 
 const effectiveTopThemes: ThemeSummary[] =
@@ -787,19 +799,20 @@ const effectiveTopThemes: ThemeSummary[] =
 ```
 
 **Key Features**:
-- **Case-insensitive comparison**: Uses exact name matching for duplicate detection
+- **Case-insensitive comparison**: Uses `.toLowerCase().trim()` for exact name matching
+- **Whitespace trimming**: Removes leading/trailing spaces to prevent formatting-related duplicates
 - **Preserves order**: Maintains original theme ordering while removing duplicates
-- **Fallback mechanism**: Automatically falls back to unique themes when assignments are unavailable
-- **Efficient filtering**: Uses Set-based approach for O(n) performance
+- **Enhanced fallback mechanism**: Automatically falls back to unique themes when assignments are unavailable
+- **Efficient filtering**: Uses Set-based approach for O(n) performance with improved comparison logic
 
 **Section sources**
-- [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+- [pulseService.ts:198-219](file://phase-2/src/services/pulseService.ts#L198-L219)
 
-### Database Adapter Implementation Details
-**New Component**: The database adapter provides seamless abstraction between SQLite and PostgreSQL backends:
+### Enhanced Database Adapter Implementation Details
+**New Component**: The database adapter provides seamless abstraction between SQLite and PostgreSQL backends with improved placeholder conversion:
 
 ```typescript
-// PostgreSQL placeholder conversion
+// Enhanced PostgreSQL placeholder conversion
 let pgSql = sql;
 let paramIndex = 1;
 while (pgSql.includes('?')) {
@@ -810,7 +823,7 @@ while (pgSql.includes('?')) {
 
 **Key Features**:
 - **Automatic backend detection**: Uses DATABASE_URL environment variable
-- **Placeholder conversion**: Converts SQLite (?) to PostgreSQL ($1, $2, etc.)
+- **Enhanced placeholder conversion**: Converts SQLite (?) to PostgreSQL ($1, $2, etc.) with improved reliability
 - **Transaction support**: Provides rollback capabilities for both backends
 - **Consistent API**: Same interface regardless of underlying database
 - **Connection pooling**: Optimized for PostgreSQL production deployments
@@ -819,3 +832,31 @@ while (pgSql.includes('?')) {
 - [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 - [dbAdapter.ts:102-124](file://phase-2/src/db/dbAdapter.ts#L102-L124)
 - [postgres.ts:13-18](file://phase-2/src/db/postgres.ts#L13-L18)
+
+### Enhanced Version Management Implementation Details
+**New Component**: The enhanced version handling in pulseService.ts provides automatic duplicate prevention:
+
+```typescript
+// Enhanced version management with automatic increment
+const existing = await dbAdapter.queryOne(
+  `SELECT MAX(version) as v FROM weekly_pulses WHERE week_start = ?`,
+  [weekStart]
+) as { v: number | null } | null;
+const version = (existing?.v ?? 0) + 1;
+
+// Insert new pulse with incremented version (no conflict handling needed since version is different)
+const result = await dbAdapter.run(
+  `INSERT INTO weekly_pulses (week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  [weekStart, weekEnd, JSON.stringify(effectiveTopThemes), JSON.stringify(quotes), JSON.stringify(actionIdeas), noteBody, now, version]
+);
+```
+
+**Key Features**:
+- **Automatic version increment**: Prevents duplicate pulses for the same week
+- **Data integrity**: Ensures unique pulse entries through version tracking
+- **Conflict prevention**: Eliminates race conditions during concurrent processing
+- **Schema compliance**: Leverages UNIQUE(week_start, version) constraint for data consistency
+
+**Section sources**
+- [pulseService.ts:226-252](file://phase-2/src/services/pulseService.ts#L226-L252)

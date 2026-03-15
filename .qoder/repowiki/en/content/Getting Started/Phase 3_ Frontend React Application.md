@@ -22,10 +22,10 @@
 
 ## Update Summary
 **Changes Made**
-- Updated Pulses Component section to reflect enhanced UI components with improved form layout
-- Added documentation for expanded date input field (200px to 250px) and better button styling
-- Enhanced mobile responsiveness documentation with improved spacing/margin-bottom
-- Updated styling patterns section to include new responsive design improvements
+- Updated Pulses Component section to reflect enhanced UI components with new formatThemeName helper function and redesigned theme badge display system
+- Added documentation for improved form layout with better vertical alignment and spacing
+- Enhanced mobile responsiveness documentation with new card-based theme badge display system
+- Updated styling patterns section to include new responsive design improvements and theme badge styling
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -47,7 +47,7 @@ Phase 3 of the Groww App Review Insights Analyzer represents the frontend React 
 
 The frontend application integrates seamlessly with the backend services developed in previous phases, providing a cohesive solution for automated review analysis and insights generation. The application follows React best practices with proper state management, component composition, and responsive design principles.
 
-**Updated** The application now benefits from centralized build orchestration through the root package.json, simplifying the development workflow and improving build process consistency across the entire project. Additionally, the Pulses component has received significant UI enhancements for better user experience and mobile responsiveness.
+**Updated** The application now benefits from centralized build orchestration through the root package.json, simplifying the development workflow and improving build process consistency across the entire project. Additionally, the Pulses component has received significant UI enhancements including a new formatThemeName helper function, redesigned theme badge display system with card-based approach, and improved form layout with better vertical alignment and spacing.
 
 ## Project Structure
 
@@ -148,6 +148,7 @@ subgraph "Business Logic Layer"
 Services[API Services]
 StateManagement[React Hooks]
 Validation[Form Validation]
+HelperFunctions[Helper Functions]
 end
 subgraph "Data Access Layer"
 HTTP[Axios HTTP Client]
@@ -167,6 +168,7 @@ Navigation --> Router
 Router --> Views
 Services --> Backend
 Views --> Navigation
+HelperFunctions --> Views
 ```
 
 **Diagram sources**
@@ -179,6 +181,7 @@ The architecture emphasizes:
 - **Type Safety**: Comprehensive TypeScript implementation for all components and data structures
 - **Asynchronous Operations**: Proper handling of API calls with loading states and error management
 - **Responsive Design**: Mobile-first approach with flexible grid layouts
+- **Helper Functions**: Utility functions for data transformation and formatting
 
 ## Detailed Component Analysis
 
@@ -257,7 +260,7 @@ The component features:
 
 ### Pulses Component
 
-**Updated** The Pulses component has received significant UI enhancements for improved user experience and mobile responsiveness. The component now features an enhanced form layout with better spacing, expanded date input fields, and improved button styling.
+**Updated** The Pulses component has received significant UI enhancements for improved user experience and mobile responsiveness. The component now features a new formatThemeName helper function, redesigned theme badge display system with card-based approach, and improved form layout with better vertical alignment and spacing.
 
 ```mermaid
 sequenceDiagram
@@ -286,17 +289,20 @@ Pulses->>Router : Navigate to Pulse Detail
 - [Pulses.tsx:55-57](file://phase-3/src/views/Pulses.tsx#L55-L57)
 
 Key functionalities with enhanced UI:
-- **Enhanced Form Layout**: Improved flexbox layout with better spacing and alignment
-- **Expanded Date Input Field**: Increased from 200px to 250px width for better visibility
-- **Improved Button Styling**: Added `white-space: nowrap` to prevent button text wrapping
-- **Better Mobile Responsiveness**: Enhanced spacing with `margin-bottom: 0.5rem` for improved mobile experience
+- **New formatThemeName Helper Function**: Transforms camelCase theme names to properly spaced display names (e.g., "appPerformance" becomes "app Performance")
+- **Redesigned Theme Badge Display**: Implemented card-based theme badges with rounded corners, subtle borders, and consistent spacing
+- **Enhanced Form Layout**: Improved flexbox layout with better spacing and alignment using `display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap'`
+- **Expanded Date Input Field**: Increased from 200px to 250px width with `minWidth: '250px'` for better visibility
+- **Improved Button Styling**: Added `white-space: 'nowrap'` to prevent button text wrapping and `marginBottom: 0` for consistent spacing
+- **Better Mobile Responsiveness**: Enhanced spacing with `marginBottom: 0.5rem` for improved mobile experience and `flexWrap: 'wrap'` for adaptive layouts
+- **Card-Based Layout**: Both form and table sections use the new card component system for consistent styling
 - **Weekly Generation**: Create pulses for specific week ranges with automatic Monday calculation
 - **Pulse Management**: Browse recent pulses with essential metrics and navigation
 - **Validation**: Client-side validation for required date selection
 - **Navigation**: Seamless routing to detailed pulse view
 
 **Section sources**
-- [Pulses.tsx:1-183](file://phase-3/src/views/Pulses.tsx#L1-L183)
+- [Pulses.tsx:1-206](file://phase-3/src/views/Pulses.tsx#L1-L206)
 
 ### Pulse Detail Component
 
@@ -437,7 +443,7 @@ The application defines comprehensive TypeScript interfaces that ensure type saf
 
 ## Styling and Theming
 
-**Updated** The application implements a comprehensive CSS architecture with enhanced responsive design patterns, particularly for the Pulses component. The styling system now includes improved mobile responsiveness and better form layout spacing.
+**Updated** The application implements a comprehensive CSS architecture with enhanced responsive design patterns, particularly for the Pulses component. The styling system now includes improved mobile responsiveness, card-based theme badges, and better form layout spacing.
 
 ### Design System
 
@@ -455,6 +461,7 @@ Buttons[Button Variants]
 Forms[Form Elements]
 Tables[Data Tables]
 Alerts[Notification System]
+Badges[Badge Components]
 end
 subgraph "Layout System"
 Grid[CSS Grid Layout]
@@ -466,7 +473,7 @@ Secondary --> Buttons
 Danger --> Alerts
 Grid --> Cards
 Flexbox --> Forms
-Responsive --> Tables
+Responsive --> Badges
 ```
 
 **Diagram sources**
@@ -496,10 +503,19 @@ The application follows consistent styling patterns across all components with r
 - Responsive Breakpoints: Mobile-first design with tablet and desktop adaptations
 
 **Enhanced Responsive Features**:
-- **Improved Form Layout**: Better spacing with `margin-bottom: 0.5rem` for form elements
-- **Expanded Input Fields**: Date inputs now use `min-width: 250px` for better visibility
-- **Button Text Wrapping**: Buttons now include `white-space: nowrap` to prevent text wrapping
-- **Mobile Flexbox**: Enhanced flexbox layouts with `flex-wrap: wrap` for better mobile adaptation
+- **Improved Form Layout**: Better spacing with `marginBottom: 0.5rem` for form elements and `gap: '1rem'` for consistent spacing
+- **Expanded Input Fields**: Date inputs now use `minWidth: 250px` for better visibility and `width: '100%'` for responsive design
+- **Button Text Wrapping**: Buttons now include `whiteSpace: 'nowrap'` to prevent text wrapping and maintain consistent button sizing
+- **Mobile Flexbox**: Enhanced flexbox layouts with `flexWrap: 'wrap'` for better mobile adaptation and `alignItems: 'flex-end'` for vertical alignment
+- **Card-Based Theme Badges**: New badge system with rounded corners (`borderRadius: '12px'`), subtle borders (`border: '1px solid var(--primary)'`), and consistent spacing (`gap: '0.4rem'`)
+- **Theme Badge Styling**: Individual badges use `background: 'var(--primary-light)'`, `color: 'var(--primary)'`, `padding: '0.25rem 0.6rem'`, and `fontSize: '0.85rem'` for consistent appearance
+
+**New Card-Based Theme Badge System**:
+- **Rounded Corners**: `borderRadius: '12px'` for modern appearance
+- **Subtle Borders**: `1px solid var(--primary)` for visual separation
+- **Consistent Padding**: `0.25rem 0.6rem` for comfortable touch targets
+- **Weighted Typography**: `fontWeight: 500` for better readability
+- **Flexible Layout**: `display: 'flex', flexWrap: 'wrap', gap: '0.4rem'` for responsive badge wrapping
 
 **Section sources**
 - [index.css:1-387](file://phase-3/src/index.css#L1-L387)
@@ -669,7 +685,7 @@ The application implements several performance optimization strategies to ensure
 **Loading States**:
 - Skeleton Screens: Placeholder content during data loading
 - Progress Indicators: Visual feedback for ongoing operations
-- Empty States: Helpful messaging for no-data scenarios
+- Empty States**: Helpful messaging for no-data scenarios
 
 **Accessibility**:
 - Semantic HTML: Proper heading hierarchy and landmark roles
@@ -677,10 +693,15 @@ The application implements several performance optimization strategies to ensure
 - Screen Reader Support: ARIA labels and roles for assistive technologies
 
 **Enhanced Responsive Design**:
-- **Improved Mobile Layouts**: Better form spacing and button sizing for mobile devices
-- **Flexible Grid Systems**: Enhanced CSS Grid and Flexbox implementations
-- **Touch-Friendly Controls**: Appropriate sizing and spacing for mobile interaction
-- **Adaptive Components**: Components that gracefully adapt to different screen sizes
+- **Improved Mobile Layouts**: Better form spacing and button sizing for mobile devices with `flexWrap: 'wrap'` and `alignItems: 'flex-end'`
+- **Flexible Grid Systems**: Enhanced CSS Grid and Flexbox implementations with `gap: '1rem'` for consistent spacing
+- **Touch-Friendly Controls**: Appropriate sizing and spacing for mobile interaction with `minWidth: '250px'` for inputs
+- **Adaptive Components**: Components that gracefully adapt to different screen sizes with card-based layout system
+
+**New UI Performance Optimizations**:
+- **Card-Based Theme Badges**: Efficient badge rendering with consistent styling and minimal DOM overhead
+- **Helper Function Caching**: formatThemeName function provides consistent theme name formatting without repeated computations
+- **Responsive Flexbox**: Optimized flexbox layouts with `flexWrap: 'wrap'` for automatic badge wrapping on smaller screens
 
 ## Troubleshooting Guide
 
@@ -709,10 +730,12 @@ Common issues and their solutions when working with the Phase 3 React applicatio
 - Ensure npm install completes successfully before build execution
 
 **UI Component Issues**:
-- Verify Pulses component form layout renders correctly
-- Check that date input fields have proper width (250px minimum)
-- Ensure buttons maintain proper text wrapping with `white-space: nowrap`
-- Validate mobile responsiveness with proper spacing and margins
+- Verify Pulses component form layout renders correctly with new card-based system
+- Check that date input fields have proper width (`minWidth: '250px'`) and responsive design
+- Ensure buttons maintain proper text wrapping with `white-space: 'nowrap'`
+- Validate mobile responsiveness with proper spacing and margins using `flexWrap: 'wrap'`
+- Confirm theme badges display correctly with card-based styling and proper spacing
+- Verify formatThemeName helper function transforms camelCase theme names correctly
 
 ### Runtime Issues
 
@@ -731,6 +754,7 @@ Common issues and their solutions when working with the Phase 3 React applicatio
 - Check for conflicting style overrides
 - Ensure proper CSS-in-JS or external stylesheet loading
 - Validate responsive breakpoints and media queries
+- Confirm card-based theme badge styling applies correctly
 
 ### Deployment Issues
 
@@ -782,7 +806,7 @@ Key achievements include:
 - Comprehensive filtering and search capabilities
 - Professional data presentation with visual indicators
 - Seamless integration with backend services
-- Enhanced mobile responsiveness with improved form layouts
+- Enhanced mobile responsiveness with improved form layouts and card-based theme badges
 
 **Development Practices**:
 - Clean component architecture with single responsibility principle
@@ -791,11 +815,13 @@ Key achievements include:
 - Comprehensive testing and validation strategies
 
 **Recent UI Enhancements**:
-- **Pulses Component Improvements**: Enhanced form layout with better spacing and mobile responsiveness
-- **Expanded Input Fields**: Date inputs now use 250px minimum width for better visibility
-- **Improved Button Styling**: Buttons maintain proper text wrapping with `white-space: nowrap`
-- **Better Mobile Experience**: Enhanced spacing with `margin-bottom: 0.5rem` for improved mobile usability
+- **Pulses Component Improvements**: Enhanced form layout with better spacing and mobile responsiveness using `flexWrap: 'wrap'` and `alignItems: 'flex-end'`
+- **New formatThemeName Helper Function**: Provides consistent theme name formatting from camelCase to properly spaced display names
+- **Card-Based Theme Badge System**: Redesigned theme display with rounded corners, subtle borders, and consistent spacing for better visual hierarchy
+- **Expanded Input Fields**: Date inputs now use `minWidth: '250px'` for better visibility and responsive design
+- **Improved Button Styling**: Buttons maintain proper text wrapping with `white-space: 'nowrap'` and consistent spacing with `marginBottom: 0`
+- **Better Mobile Experience**: Enhanced spacing with `marginBottom: 0.5rem` for improved mobile usability and adaptive flexbox layouts
 
 The application successfully bridges the gap between complex backend services and user-friendly interfaces, providing valuable insights from public Google Play Store reviews while maintaining data privacy and system reliability. The modular architecture ensures maintainability and extensibility for future enhancements.
 
-**Updated** The centralized build orchestration system significantly improves the development workflow by providing simplified commands, consistent build processes, and streamlined cross-phase coordination, making the entire development experience more efficient and reliable. Additionally, the recent UI enhancements in the Pulses component demonstrate the application's commitment to providing an excellent user experience across all devices and screen sizes.
+**Updated** The centralized build orchestration system significantly improves the development workflow by providing simplified commands, consistent build processes, and streamlined cross-phase coordination, making the entire development experience more efficient and reliable. Additionally, the recent UI enhancements in the Pulses component demonstrate the application's commitment to providing an excellent user experience across all devices and screen sizes, with the new formatThemeName helper function and card-based theme badge system enhancing both functionality and visual appeal.

@@ -22,31 +22,59 @@ export async function generateThemesFromReviews(reviews: ReviewRow[]): Promise<T
     .slice(0, 120);
 
   const system =
-    'You are a product analyst. You will propose 3 to 5 themes from app store reviews. ' +
-    'Do not include any personally identifying information. Do not include usernames, emails, phone numbers, IDs, or links. ' +
-    'Each theme must have a UNIQUE name - do not repeat the same theme name.';
+    'You are a product analyst. Analyze app store reviews and identify 3 to 5 DISTINCT categories of feedback. ' +
+    'Each category must be fundamentally different from the others (e.g., Technical Issues, Pricing, Customer Service, UI/UX, Features). ' +
+    'Do not paraphrase the same concept with different wording. ' +
+    'Ensure no two categories overlap in meaning. ' +
+    'Do not include any personally identifying information.';
 
   const user =
-    `Analyze the following Groww Android app reviews and propose 3 to 5 themes max.\n` +
-    `Each theme must have a short UNIQUE name and a one-sentence description.\n` +
-    `Avoid duplicate theme names - each theme should be distinct.\n\n` +
+    `Analyze the following Groww Android app reviews and identify 3 to 5 DISTINCT categories of feedback.\n\n` +
+    `CRITICAL REQUIREMENTS:\n` +
+    `1. Each category must be fundamentally DIFFERENT from the others\n` +
+    `2. Do NOT paraphrase the same concept (e.g., "Technical Issues" and "Technical Problems" are the same)\n` +
+    `3. Examples of distinct categories: Technical Issues, Pricing/Value, Customer Support, UI/UX Design, Features/Functionality\n` +
+    `4. Output theme names in Title Case with proper spacing (e.g., "Technical Issues", not "TechnicalIssues")\n\n` +
+    `Reviews:\n` +
     sample.map((t, i) => `- (${i + 1}) ${t}`).join('\n');
 
-  const schemaHint = `{"themes":[{"name":"string","description":"string"}]}`;
+  const schemaHint = `{"themes":[{"name":"Title Case Theme Name","description":"One sentence description"}]}`;
 
   const raw = await groqJson<unknown>({ system, user, schemaHint });
   const parsed = GenerateThemesResponseSchema.parse(raw);
   
-  // Deduplicate themes by name (case-insensitive)
-  const seen = new Set<string>();
-  const uniqueThemes = parsed.themes.filter(t => {
-    const key = t.name.toLowerCase().trim();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // Deduplicate themes by semantic similarity (check for overlapping words)
+  const uniqueThemes: ThemeDef[] = [];
+  for (const theme of parsed.themes) {
+    const normalizedName = theme.name.toLowerCase().trim();
+    const nameWords = normalizedName.split(/\s+/);
+    
+    // Check if this theme is too similar to existing ones
+    let isDuplicate = false;
+    for (const existing of uniqueThemes) {
+      const existingNormalized = existing.name.toLowerCase().trim();
+      const existingWords = existingNormalized.split(/\s+/);
+      
+      // Check for significant word overlap
+      const commonWords = nameWords.filter(w => existingWords.includes(w));
+      if (commonWords.length >= Math.min(nameWords.length, existingWords.length) * 0.5) {
+        isDuplicate = true;
+        break;
+      }
+      
+      // Check if one contains the other
+      if (normalizedName.includes(existingNormalized) || existingNormalized.includes(normalizedName)) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (!isDuplicate) {
+      uniqueThemes.push(theme);
+    }
+  }
   
-  return uniqueThemes;
+  return uniqueThemes.slice(0, 5);
 }
 
 export async function upsertThemes(themes: ThemeDef[], window?: { from?: string; to?: string }): Promise<number[]> {
