@@ -10,6 +10,7 @@
 - [phase-2 logger](file://phase-2/src/core/logger.ts)
 - [phase-1 db](file://phase-1/src/db/index.ts)
 - [phase-2 db](file://phase-2/src/db/index.ts)
+- [phase-2 postgres](file://phase-2/src/db/postgres.ts)
 - [phase-2 scheduler](file://phase-2/src/jobs/schedulerJob.ts)
 - [phase-2 email service](file://phase-2/src/services/emailService.ts)
 - [phase-2 pulse service](file://phase-2/src/services/pulseService.ts)
@@ -38,11 +39,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced Vercel deployment configuration with improved CORS setup supporting dynamic allowed origins
-- Standardized Node.js 20.x version across all phases using engines specification
-- Implemented Vercel permission fixes using npx --yes commands for frontend build processes
-- Updated CORS configuration to dynamically include FRONTEND_URL environment variable
-- Improved deployment architecture with consistent Node.js runtime versions
+- Enhanced PostgreSQL deployment support for Render platform with dedicated PostgreSQL connection pool
+- Updated Docker configuration for production readiness with improved database connection handling
+- Implemented dual database support (SQLite for development, PostgreSQL for production) with automatic selection
+- Added PostgreSQL-specific schema initialization and connection pooling
+- Improved database connection handling with SSL configuration for Render compatibility
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -77,7 +78,7 @@ The repository is split into three phases with integrated frontend deployment:
 
 Key runtime components:
 - HTTP servers for each phase
-- SQLite-backed persistence
+- Dual database support (SQLite for development, PostgreSQL for production)
 - Scheduler for automated pulse generation and email delivery
 - Email transport via SMTP
 - Structured logging
@@ -92,7 +93,7 @@ P1DB["SQLite DB<br/>reviews"]
 end
 subgraph "Phase 2"
 P2S["HTTP Server<br/>/health, /api/themes/*, /api/pulses/*, /api/user-preferences/*, /api/email/test"]
-P2DB["SQLite DB<br/>themes, review_themes, weekly_pulses, user_preferences, scheduled_jobs"]
+P2DB["Dual DB Support<br/>SQLite (dev) / PostgreSQL (prod)"]
 SCH["Scheduler Job<br/>runSchedulerOnce()"]
 EMAIL["Email Service<br/>sendPulseEmail(), sendTestEmail()"]
 GROQ["Groq Client<br/>groqJson()"]
@@ -125,7 +126,8 @@ COMPOSE --> DOCKER
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
 - [phase-2 server:1-266](file://phase-2/src/api/server.ts#L1-L266)
 - [phase-1 db:1-31](file://phase-1/src/db/index.ts#L1-L31)
-- [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-2 db:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [phase-2 postgres:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
@@ -139,16 +141,16 @@ COMPOSE --> DOCKER
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
 - [phase-2 server:1-266](file://phase-2/src/api/server.ts#L1-L266)
 - [phase-1 db:1-31](file://phase-1/src/db/index.ts#L1-L31)
-- [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-2 db:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 
 ## Core Components
 - HTTP Servers
   - Phase 1 exposes scraping and listing endpoints.
   - Phase 2 exposes health, theming, pulse, user preferences, and email test endpoints, plus starts a scheduler when configured.
-- Persistence
-  - Phase 1: reviews table with week indexing.
-  - Phase 2: themes, review_themes, weekly_pulses, user_preferences, scheduled_jobs with appropriate indexes.
+- Dual Database Support
+  - Phase 1: SQLite reviews table with week indexing.
+  - Phase 2: Automatic database selection between SQLite (development) and PostgreSQL (production) with comprehensive schema support.
 - Scheduler
   - Periodic job runner that computes due recipients, generates pulses, sends emails, and records outcomes.
 - Email Delivery
@@ -166,7 +168,8 @@ COMPOSE --> DOCKER
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
 - [phase-2 server:1-266](file://phase-2/src/api/server.ts#L1-L266)
 - [phase-1 db:1-31](file://phase-1/src/db/index.ts#L1-L31)
-- [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-2 db:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [phase-2 postgres:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
@@ -175,9 +178,9 @@ COMPOSE --> DOCKER
 - [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 
 ## Architecture Overview
-The system comprises two primary runtime phases with containerized deployment capabilities and a modern frontend deployment strategy:
+The system comprises two primary runtime phases with containerized deployment capabilities and a modern frontend deployment strategy, now featuring enhanced PostgreSQL support for production environments:
 - Phase 1: Standalone API for scraping and storing reviews into SQLite.
-- Phase 2: Full-featured API with theming, pulse generation, scheduled emails, and persistence.
+- Phase 2: Full-featured API with theming, pulse generation, scheduled emails, and persistence, supporting both SQLite (development) and PostgreSQL (production) databases.
 - Phase 3: React frontend with Vercel deployment and client-side routing.
 
 ```mermaid
@@ -185,31 +188,38 @@ sequenceDiagram
 participant Client as "Client"
 participant Vercel as "Vercel Frontend"
 participant P2Server as "Phase 2 Server"
+participant DBSelector as "DB Selector"
+participant SQLiteDB as "SQLite"
+participant PGPool as "PostgreSQL Pool"
 participant Scheduler as "Scheduler"
 participant Pulse as "Pulse Service"
 participant Email as "Email Service"
-participant DB as "SQLite"
 Client->>Vercel : React Dashboard Access
 Vercel->>P2Server : API Calls (/api/*)
+P2Server->>DBSelector : Check DATABASE_URL
+alt PostgreSQL Mode
+DBSelector->>PGPool : Connect via DATABASE_URL
+PGPool-->>P2Server : PostgreSQL Connection
+else SQLite Mode
+DBSelector->>SQLiteDB : Use local SQLite file
+SQLiteDB-->>P2Server : SQLite Connection
+end
 P2Server->>Pulse : generatePulse(week_start)
-Pulse->>DB : read themes, reviews, week stats
-Pulse-->>P2Server : WeeklyPulse
-P2Server-->>Vercel : { ok, pulse }
+Pulse->>P2Server : WeeklyPulse
 Note over Scheduler,P2Server : On startup (if GROQ_API_KEY present)
 Scheduler->>P2Server : runSchedulerOnce()
-P2Server->>Pulse : generatePulse(weekStart)
 P2Server->>Email : sendPulseEmail(to, pulse)
 Email-->>P2Server : { messageId }
-P2Server->>DB : update scheduled_jobs
 ```
 
 **Diagram sources**
-- [phase-2 server:76-90](file://phase-2/src/api/server.ts#L76-L90)
+- [phase-2 server:18-23](file://phase-2/src/api/server.ts#L18-L23)
+- [phase-2 db:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 - [phase-2 scheduler:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
 - [phase-2 pulse service:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [phase-2 email service:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
-- [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
-- [phase-3 vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
+- [phase-2 db:1-133](file://phase-2/src/db/index.ts#L1-L133)
 
 ## Detailed Component Analysis
 
@@ -243,87 +253,54 @@ Operational notes:
 - [phase-2 server:28-232](file://phase-2/src/api/server.ts#L28-L232)
 - [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
-### Persistence Model
+### Dual Database Support
 - Phase 1
-  - reviews: id, platform, rating, title, text, clean_text, created_at, week_start, week_end, raw_payload.
+  - reviews: id, platform, rating, title, text, clean_text, created_at, week_start, week_end, has_unicode.
   - Index: idx_reviews_week_start.
 - Phase 2
-  - themes: id, name, description, created_at, valid_from, valid_to.
-  - review_themes: id, review_id, theme_id, confidence.
-  - weekly_pulses: id, week_start, week_end, top_themes (JSON), user_quotes (JSON), action_ideas (JSON), note_body, created_at, version.
-  - user_preferences: id, email, timezone, preferred_day_of_week, preferred_time, created_at, updated_at, active.
-  - scheduled_jobs: id, user_preference_id, week_start, scheduled_at_utc, sent_at_utc, status, last_error.
+  - Automatic database selection based on DATABASE_URL environment variable.
+  - SQLite mode: local file-based database for development.
+  - PostgreSQL mode: connection pool with SSL configuration for Render compatibility.
+  - Shared schema across both databases for consistent data model.
+
+**Updated** Enhanced PostgreSQL deployment support with dedicated connection pool and SSL configuration for Render platform compatibility.
 
 ```mermaid
-erDiagram
-REVIEWS {
-text id PK
-text platform
-int rating
-text title
-text text
-text clean_text
-text created_at
-text week_start
-text week_end
-text raw_payload
-}
-THEMES {
-int id PK
-text name
-text description
-text created_at
-text valid_from
-text valid_to
-}
-REVIEW_THEMES {
-int id PK
-text review_id FK
-int theme_id FK
-float confidence
-}
-WEEKLY_PULSES {
-int id PK
-text week_start
-text week_end
-text top_themes
-text user_quotes
-text action_ideas
-text note_body
-text created_at
-int version
-}
-USER_PREFERENCES {
-int id PK
-text email
-text timezone
-int preferred_day_of_week
-text preferred_time
-text created_at
-text updated_at
-int active
-}
-SCHEDULED_JOBS {
-int id PK
-int user_preference_id FK
-text week_start
-text scheduled_at_utc
-text sent_at_utc
-text status
-text last_error
-}
-THEMES ||--o{ REVIEW_THEMES : "has"
-REVIEWS ||--o{ REVIEW_THEMES : "assigned_to"
-USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
+flowchart TD
+Start(["Application Startup"]) --> CheckEnv["Check DATABASE_URL Environment Variable"]
+CheckEnv --> HasURL{"DATABASE_URL Present?"}
+HasURL --> |Yes| InitPG["Initialize PostgreSQL Pool<br/>SSL: rejectUnauthorized=false"]
+HasURL --> |No| InitSQLite["Initialize SQLite Database<br/>Local file-based"]
+InitPG --> PGPool["PostgreSQL Connection Pool<br/>Connection String + SSL Config"]
+InitSQLite --> SQLiteDB["SQLite Database<br/>Local File Path"]
+PGPool --> Ready["Ready for Operations"]
+SQLiteDB --> Ready
 ```
 
 **Diagram sources**
-- [phase-1 db:8-26](file://phase-1/src/db/index.ts#L8-L26)
-- [phase-2 db:8-88](file://phase-2/src/db/index.ts#L8-L88)
+- [phase-2 db:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 
 **Section sources**
 - [phase-1 db:1-31](file://phase-1/src/db/index.ts#L1-L31)
-- [phase-2 db:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [phase-2 db:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [phase-2 postgres:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+
+### PostgreSQL Connection Handling
+- Connection Pool Management
+  - Singleton pattern ensures efficient connection reuse.
+  - Environment-driven configuration with DATABASE_URL requirement.
+  - SSL configuration with rejectUnauthorized: false for Render compatibility.
+  - Error handling and logging for connection pool events.
+- Schema Initialization
+  - Comprehensive table creation for all required entities.
+  - Proper indexing strategy for performance optimization.
+  - Foreign key constraints and unique constraints for data integrity.
+  - Timestamp columns with appropriate data types.
+
+**Section sources**
+- [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
+- [phase-2 postgres:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
 
 ### Scheduler and Email Automation
 - Scheduler
@@ -372,6 +349,7 @@ Update --> Loop
   - DATABASE_FILE, PORT.
 - Phase 2
   - DATABASE_FILE, PORT, GROQ_API_KEY, GROQ_MODEL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
+  - **Updated**: DATABASE_URL for PostgreSQL connection (optional, enables production mode).
 - Phase 3 (Frontend)
   - Vite configuration with React Router and proxy setup for API communication.
   - **Updated**: Node.js 20.x engine specification for consistent runtime environment.
@@ -379,6 +357,7 @@ Update --> Loop
 **Section sources**
 - [phase-1 env:1-6](file://phase-1/src/config/env.ts#L1-L6)
 - [phase-2 env:1-23](file://phase-2/src/config/env.ts#L1-L23)
+- [phase-2 env:8-11](file://phase-2/src/config/env.ts#L8-L11)
 - [phase-3 vite.config.ts:6-14](file://phase-3/vite.config.ts#L6-L14)
 - [phase-3 package.json:24-26](file://phase-3/package.json#L24-L26)
 
@@ -388,6 +367,7 @@ Update --> Loop
   - better-sqlite3 for local persistence.
   - groq-sdk for LLM integration.
   - nodemailer for SMTP.
+  - pg for PostgreSQL connection pooling.
   - zod for schema validation.
   - React ecosystem for frontend (React, React DOM, React Router DOM).
 - Build/test/dev dependencies
@@ -396,10 +376,13 @@ Update --> Loop
   - Vite for frontend bundling and development server.
   - React development dependencies for frontend build process.
 
+**Updated** Added PostgreSQL driver (pg) for production database support.
+
 ```mermaid
 graph LR
 P2Server["phase-2 server"] --> Express["express"]
 P2Server --> DB["better-sqlite3"]
+P2Server --> PG["pg (PostgreSQL)"]
 P2Server --> Groq["groq-sdk"]
 P2Server --> Nodemailer["nodemailer"]
 P2Server --> Zod["zod"]
@@ -416,17 +399,19 @@ TESTS["Node.js Test Runner"] --> P2Server
 
 **Diagram sources**
 - [phase-1 package.json:13-24](file://phase-1/package.json#L13-L24)
-- [phase-2 package.json:13-28](file://phase-2/package.json#L13-L28)
+- [phase-2 package.json:13-23](file://phase-2/package.json#L13-L23)
 - [phase-3 package.json:11-16](file://phase-3/package.json#L11-L16)
 
 **Section sources**
 - [phase-1 package.json:1-26](file://phase-1/package.json#L1-L26)
-- [phase-2 package.json:1-30](file://phase-2/package.json#L1-L30)
+- [phase-2 package.json:1-34](file://phase-2/package.json#L1-L34)
 - [phase-3 package.json:1-28](file://phase-3/package.json#L1-L28)
 
 ## Performance Considerations
 - Database
   - Use indexes on week_start and scheduled_jobs status/time to optimize lookups.
+  - PostgreSQL connection pooling reduces connection overhead in production.
+  - SQLite provides excellent performance for development workloads.
   - Batch operations for theme upserts reduce transaction overhead.
 - I/O Bound Tasks
   - Scraping and LLM calls are external I/O bound; consider timeouts and retries.
@@ -442,11 +427,13 @@ TESTS["Node.js Test Runner"] --> P2Server
 - Logging
   - Console-based INFO/ERROR logs are used across components.
   - Add structured logging (e.g., Bunyan, Winston) and export to centralized systems.
+  - PostgreSQL pool error logging for connection troubleshooting.
 - Metrics
   - Expose Prometheus-compatible metrics endpoint or integrate with APM.
   - Track request latency, error rates, job success/failure, and Groq API timings.
 - Alerts
   - Alert on failed scheduled jobs, repeated errors, and health check failures.
+  - PostgreSQL connection pool errors and database availability issues.
 - Centralized Logging
   - Ship logs to a log aggregator (e.g., ELK, Loki) with correlation IDs.
 
@@ -456,22 +443,26 @@ TESTS["Node.js Test Runner"] --> P2Server
   - Set environment variables for the target phase.
   - Start the server using dev scripts.
   - For frontend development, use Vite's development server with proxy configuration.
+  - **Updated**: Default to SQLite mode (no DATABASE_URL required).
 - Staging
   - Use a dedicated database file and SMTP credentials.
   - Enable scheduler only when Groq API key is available.
+  - **Updated**: Can run in either SQLite or PostgreSQL mode based on configuration.
 - Production
   - Use immutable images, non-root users, minimal base images.
   - Enforce secrets management and network policies.
   - Configure health checks and readiness probes.
+  - **Updated**: PostgreSQL mode requires DATABASE_URL environment variable.
 
 ## Containerization & Orchestration
 
 ### Single-Stage Docker Build (Optimized for Render)
-**Updated** The project now implements a streamlined single-stage Docker build optimized specifically for Render deployment, with the Dockerfile moved to the root directory for simplified containerization:
+**Updated** The project now implements a streamlined single-stage Docker build optimized specifically for Render deployment, with enhanced database connection support:
 
 **Build Process**
 - Base Image: node:20-alpine with Python3, make, and g++ for better-sqlite3 compilation
 - Enhanced dependency management: Installs all dependencies including devDependencies for build process
+- PostgreSQL support: Includes pg driver for production database connections
 - Post-build cleanup: Uses `npm prune --production` to remove devDependencies and reduce image size
 - Optimized layer caching with efficient build steps
 - Integrated health check for container monitoring
@@ -479,6 +470,7 @@ TESTS["Node.js Test Runner"] --> P2Server
 
 **Production Configuration**
 - Environment variables: NODE_ENV=production, PORT=4002, DATABASE_FILE=/app/data/phase1.db
+- **Updated**: DATABASE_URL for PostgreSQL mode (optional)
 - Health check via HTTP GET to /health endpoint with 30-second intervals
 - Data directory creation for SQLite persistence
 - Direct execution of compiled TypeScript output from dist/api/server.js
@@ -501,6 +493,7 @@ Local development environment with persistent storage and environment variable m
 - Environment variable injection from .env file
 - Health check integration with 30-second intervals
 - Enhanced health check configuration with improved timeout settings
+- **Updated**: Supports both SQLite and PostgreSQL modes
 
 **Volume Management**
 - Named volume "data" mounted to /app/data
@@ -510,16 +503,17 @@ Local development environment with persistent storage and environment variable m
 - [docker-compose.yml:1-34](file://phase-2/docker-compose.yml#L1-L34)
 
 ### Kubernetes Deployment (Render Platform)
-**Updated** Production-ready deployment configuration for Render's container platform with enhanced repository integration:
+**Updated** Production-ready deployment configuration for Render's container platform with enhanced repository integration and database support:
 
 **Platform Configuration**
 - Web service type with Docker runtime
 - Repository integration with GitHub: https://github.com/aravinthraj-ramalingam/Groww-App-Review-Insights-Analyzer-
-- **Updated**: DockerfilePath now points to ./Dockerfile in root directory
+- **Updated**: DockerfilePath now points to ./phase-2/Dockerfile for proper build context
 - **Updated**: DockerContext now points to ./phase-2 for build context
 - Multi-service deployment with single container
 - Environment variable management with sync control
 - Persistent disk mounting for data persistence
+- **Updated**: Supports PostgreSQL connection via DATABASE_URL environment variable
 
 **Resource Management**
 - Disk allocation: 1GB persistent volume
@@ -539,6 +533,7 @@ Local development environment with persistent storage and environment variable m
 - Health checks for container monitoring
 - Persistent volume for data durability
 - **Updated**: Enhanced .dockerignore patterns at root level for comprehensive exclusion
+- **Updated**: PostgreSQL connection pool with SSL configuration for secure production connections
 
 **Section sources**
 - [Dockerfile:18-42](file://Dockerfile#L18-L42)
@@ -619,6 +614,7 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
   - Distribute traffic across pods; sticky sessions not required.
 - Replication
   - For write-heavy workloads, consider a clustered database or migration to a managed RDBMS.
+  - **Updated**: PostgreSQL supports native clustering and replication.
 - Queue-Based Delivery
   - Offload email sending to a queue/job system for decoupling and reliability.
 - Container Scaling
@@ -633,6 +629,7 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
 ## Security & Compliance
 - Secrets Management
   - Store API keys and SMTP credentials in a secret manager; mount as environment variables.
+  - **Updated**: DATABASE_URL for PostgreSQL connections.
 - Network Security
   - Restrict inbound/outbound egress; use private networks and VPCs.
 - Data Protection
@@ -648,6 +645,7 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
   - Minimal base images with security scanning
   - Environment variable management for secrets
   - **Updated**: Enhanced .dockerignore patterns prevent accidental inclusion of sensitive files
+  - **Updated**: PostgreSQL SSL configuration with rejectUnauthorized: false for Render compatibility
 - Frontend Security
   - Vercel's security features protect against common web vulnerabilities
   - HTTPS enforcement and security headers
@@ -656,7 +654,8 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
 
 ## Backup & Recovery
 - Backups
-  - Snapshot the SQLite file; automate periodic backups to durable storage.
+  - Snapshot the SQLite file or PostgreSQL database; automate periodic backups to durable storage.
+  - **Updated**: PostgreSQL supports native backup tools and cloud-native solutions.
 - Recovery
   - Validate backups; practice restoration drills.
   - Restore to a temporary environment before promoting to production.
@@ -665,6 +664,7 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
 - Container Data Persistence
   - Persistent volume snapshots for containerized deployments
   - Volume backup strategies for stateful applications
+  - **Updated**: PostgreSQL supports point-in-time recovery and logical backups.
 - Frontend Data
   - Static assets cached by Vercel's CDN
   - Versioned builds for reliable rollbacks
@@ -680,6 +680,7 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
   - Multi-region container deployments
   - Volume replication for persistent data
   - Automated failover mechanisms
+  - **Updated**: PostgreSQL clustering and replication for high availability.
 - Frontend DR
   - Vercel's global infrastructure provides natural redundancy
   - Edge locations ensure geographic distribution
@@ -690,8 +691,10 @@ These npx --yes commands eliminate interactive prompts during Vercel builds, ens
   - Dependency updates, image rebuilds, DB maintenance.
 - Rotation
   - Rotate secrets periodically; rotate Groq and SMTP credentials.
+  - **Updated**: Rotate PostgreSQL connection credentials.
 - Capacity Planning
   - Monitor growth in reviews and pulses; plan storage and compute increases.
+  - **Updated**: Monitor PostgreSQL connection pool utilization.
 - Container Maintenance
   - Regular container image updates and security patches
   - Volume cleanup and optimization
@@ -713,12 +716,14 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - Scheduler Logic: Due date calculation and email dispatch simulation
 - User Preferences: CRUD operations with active preference management
 - Schema Validation: Zod schema validation testing
+- **Updated**: Database connection testing for both SQLite and PostgreSQL modes
 
 **Test Architecture**
 - Each component has its own test file for focused testing
 - In-memory SQLite databases for isolated test environments
 - Stubbing and mocking for external dependencies (Groq API, email services)
 - Comprehensive assertion coverage for business logic validation
+- **Updated**: Database mode switching for testing both SQLite and PostgreSQL paths
 
 **Test Execution**
 - Built-in Node.js test runner (`node --test`)
@@ -740,6 +745,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - **Scheduler Logic**: Tests due date calculation, timezone handling, and email dispatch workflows
 - **User Preferences**: Confirms CRUD operations, active preference management, and data validation
 - **Schema Validation**: Validates Zod schema parsing and type safety
+- **Database Support**: Tests automatic database selection and schema initialization for both SQLite and PostgreSQL modes
 
 **Section sources**
 - [phase-2 assignment.test.ts:57-92](file://phase-2/src/tests/assignment.test.ts#L57-L92)
@@ -753,6 +759,8 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Verify /health responds OK.
 - Database Issues
   - Confirm schema initialization and indexes exist.
+  - **Updated**: Check DATABASE_URL environment variable for PostgreSQL mode.
+  - **Updated**: Verify PostgreSQL connection pool status and SSL configuration.
 - Scheduler Not Running
   - Ensure GROQ_API_KEY is set; check logs for initial tick failure.
 - Email Failures
@@ -771,12 +779,18 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - Verify FRONTEND_URL environment variable is set for dynamic origins.
   - Check allowedOrigins array includes both static and dynamic entries.
   - Ensure production mode uses strict origin validation.
+- **Updated** Database Connection Issues
+  - For PostgreSQL mode: verify DATABASE_URL format and connectivity.
+  - For SQLite mode: check file permissions and path accessibility.
+  - Monitor PostgreSQL pool error logs for connection troubleshooting.
 
 **Section sources**
 - [phase-2 server:22-22](file://phase-2/src/api/server.ts#L22-L22)
 - [phase-2 scheduler:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
 - [phase-2 email service:99-112](file://phase-2/src/services/emailService.ts#L99-L112)
 - [phase-2 pulse service:179-188](file://phase-2/src/services/pulseService.ts#L179-L188)
+- [phase-2 db:6-7](file://phase-2/src/db/index.ts#L6-L7)
+- [phase-2 postgres:8-11](file://phase-2/src/db/postgres.ts#L8-L11)
 - [vercel.json:7-9](file://phase-3/vercel.json#L7-L9)
 - [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
 - [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
@@ -808,6 +822,20 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [phase-2 server:15-16](file://phase-2/src/api/server.ts#L15-L16)
 - [phase-2 server:254-263](file://phase-2/src/api/server.ts#L254-L263)
 - [phase-2 email service:132-141](file://phase-2/src/services/emailService.ts#L132-L141)
+
+### Runbook: Switch to PostgreSQL Mode
+- Steps
+  - Set DATABASE_URL environment variable with PostgreSQL connection string.
+  - Ensure SSL configuration is compatible with database provider.
+  - Restart the application to initialize PostgreSQL connection pool.
+  - Verify database schema initialization and connection status.
+- Expected Outcome
+  - Application connects to PostgreSQL; all database operations use PostgreSQL.
+
+**Section sources**
+- [phase-2 env:8-11](file://phase-2/src/config/env.ts#L8-L11)
+- [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
+- [phase-2 db:14-15](file://phase-2/src/db/index.ts#L14-L15)
 
 ### Runbook: Investigate Scheduled Emails
 - Steps
@@ -844,6 +872,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 **Section sources**
 - [phase-1 db:7-29](file://phase-1/src/db/index.ts#L7-L29)
 - [phase-2 db:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [phase-2 postgres:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
 
 ### Runbook: Containerized Deployment
 - Steps
@@ -904,11 +933,16 @@ The project implements a comprehensive testing framework using Node.js built-in 
 This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices and comprehensive frontend deployment support. The recent enhancements significantly improve the deployment experience and operational efficiency:
 
 **Key Improvements:**
+- **Enhanced PostgreSQL Deployment Support**: Dedicated PostgreSQL connection pool with SSL configuration for Render platform compatibility
+- **Dual Database Architecture**: Automatic selection between SQLite (development) and PostgreSQL (production) for flexible deployment scenarios
+- **Improved Database Connection Handling**: Robust connection management with proper error handling and logging
 - **Enhanced Vercel Deployment**: Improved CORS configuration with dynamic allowed origins for flexible domain management
 - **Node.js 20.x Standardization**: Consistent runtime environment across all phases using engines specification
 - **Vercel Permission Fixes**: Implementation of npx --yes commands eliminates build-time prompts and improves CI/CD reliability
 - **Centralized Build Orchestration**: Streamlined multi-phase build process through root package.json coordination
 
-The Vercel configuration with framework support, rewrite rules for client-side routing, and standardized Node.js runtime creates a robust foundation for both backend and frontend deployment strategies. The enhanced CORS setup with dynamic origins provides improved security while maintaining flexibility for custom domains. The move of Dockerfile to the root directory with comprehensive .dockerignore patterns at the root level, combined with the new Vercel deployment setup, creates a unified deployment architecture that supports both traditional containerized deployments and modern edge computing approaches.
+The dual database support creates a robust foundation for both development and production environments, allowing seamless migration between SQLite for local development and PostgreSQL for scalable production deployments. The enhanced PostgreSQL deployment with Render compatibility ensures reliable cloud-native operation with proper SSL configuration and connection pooling.
+
+The Vercel configuration with framework support, rewrite rules for client-side routing, and standardized Node.js runtime creates a robust foundation for both backend and frontend deployment strategies. The enhanced CORS setup with dynamic origins provides improved security while maintaining flexibility for custom domains.
 
 By implementing comprehensive testing frameworks, production-ready orchestration configurations, robust containerization strategies, and modern frontend deployment practices with enhanced CORS security, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.

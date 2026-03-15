@@ -88,22 +88,26 @@ function Pulses() {
           <h2 className="card-title">Generate New Pulse</h2>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+          <div className="form-group" style={{ flex: 1, minWidth: '250px' }}>
             <label className="form-label">Week Starting (Monday)</label>
             <input
               type="date"
               className="form-input"
               value={weekStart}
               onChange={(e) => setWeekStart(e.target.value)}
+              style={{ width: '100%' }}
             />
           </div>
-          <button 
-            className="btn btn-primary" 
-            onClick={handleGenerate}
-            disabled={generating}
-          >
-            {generating ? 'Generating...' : '📊 Generate Pulse'}
-          </button>
+          <div style={{ marginBottom: '0.5rem' }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={handleGenerate}
+              disabled={generating}
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {generating ? 'Generating...' : '📊 Generate Pulse'}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -198,10 +198,15 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
   const topThemes = themeStats.slice(0, 3);
 
   // If no theme assignments yet, fall back to global themes with 0 counts
+  // Ensure unique themes by name
+  const uniqueThemes = themes.filter((t, index, self) => 
+    index === self.findIndex((tt) => tt.name === t.name)
+  );
+  
   const effectiveTopThemes: ThemeSummary[] =
     topThemes.length >= 1
       ? topThemes
-      : themes.slice(0, 3).map((t) => ({
+      : uniqueThemes.slice(0, 3).map((t) => ({
           theme_id: t.id,
           name: t.name,
           description: t.description,
