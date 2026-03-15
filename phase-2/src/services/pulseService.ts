@@ -194,12 +194,17 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
 
   // Aggregate stats + pick top 3 themes
   const themeStats = await getWeekThemeStats(weekStart);
-  const topThemes = themeStats.slice(0, 3);
+  
+  // Deduplicate themes by name (case-insensitive) before slicing
+  const uniqueThemeStats = themeStats.filter((t, index, self) => 
+    index === self.findIndex((tt) => tt.name.toLowerCase().trim() === t.name.toLowerCase().trim())
+  );
+  const topThemes = uniqueThemeStats.slice(0, 3);
 
   // If no theme assignments yet, fall back to global themes with 0 counts
   // Ensure unique themes by name
   const uniqueThemes = themes.filter((t, index, self) => 
-    index === self.findIndex((tt) => tt.name === t.name)
+    index === self.findIndex((tt) => tt.name.toLowerCase().trim() === t.name.toLowerCase().trim())
   );
   
   const effectiveTopThemes: ThemeSummary[] =
@@ -226,9 +231,19 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
   const version = (existing?.v ?? 0) + 1;
 
   const now = new Date().toISOString();
+  
+  // Use INSERT with ON CONFLICT to handle duplicate week_start
   const result = await dbAdapter.run(
     `INSERT INTO weekly_pulses (week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (week_start) DO UPDATE SET
+       week_end = excluded.week_end,
+       top_themes = excluded.top_themes,
+       user_quotes = excluded.user_quotes,
+       action_ideas = excluded.action_ideas,
+       note_body = excluded.note_body,
+       created_at = excluded.created_at,
+       version = excluded.version + 1`,
     [
       weekStart,
       weekEnd,
@@ -241,7 +256,19 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
     ]
   );
 
-  return (await getPulse(result.lastID!))!;
+  // Get the pulse by week_start since we may have updated instead of inserted
+  const pulseResult = await dbAdapter.queryOne(
+    `SELECT * FROM weekly_pulses WHERE week_start = ? ORDER BY version DESC LIMIT 1`,
+    [weekStart]
+  );
+  if (!pulseResult) throw new Error('Failed to retrieve pulse after insert/update');
+  
+  return {
+    ...pulseResult,
+    top_themes: JSON.parse(pulseResult.top_themes),
+    user_quotes: JSON.parse(pulseResult.user_quotes),
+    action_ideas: JSON.parse(pulseResult.action_ideas)
+  };
 }
 
 export async function getPulse(id: number): Promise<WeeklyPulse | null> {

@@ -10,6 +10,8 @@
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [groqClient.ts](file://phase-2/src/services/groqClient.ts)
+- [dbAdapter.ts](file://phase-2/src/db/dbAdapter.ts)
+- [postgres.ts](file://phase-2/src/db/postgres.ts)
 - [db/index.ts](file://phase-2/src/db/index.ts)
 - [env.ts](file://phase-2/src/config/env.ts)
 - [runPulsePipeline.ts](file://phase-2/scripts/runPulsePipeline.ts)
@@ -20,19 +22,17 @@
 - [assignment.test.ts](file://phase-2/src/tests/assignment.test.ts)
 - [email.test.ts](file://phase-2/src/tests/email.test.ts)
 - [cleanupDuplicateThemes.ts](file://phase-2/scripts/cleanupDuplicateThemes.ts)
+- [migrateToPostgres.ts](file://phase-2/scripts/migrateToPostgres.ts)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Enhanced pulse generation system with sophisticated orchestration of weekly insights pipeline
-- Added comprehensive sentiment-aware aggregation with theme analysis and user feedback integration
-- Implemented advanced action recommendation generation with LLM-powered suggestions
-- Strengthened validation and quality assurance processes with improved error handling
-- Expanded content formatting capabilities with enhanced HTML template rendering
-- Improved performance optimization for weekly batch processing with better memory management
-- **Added deduplication logic for unique theme selection in weekly pulse generation**
-- **Implemented case-insensitive theme name deduplication to prevent duplicate themes**
-- **Enhanced fallback mechanism for empty assignment scenarios**
+- Migrated all database operations to PostgreSQL using a unified adapter pattern
+- Converted getWeekThemeStats, pickQuotes, and generatePulse functions to use async/await with proper transaction handling
+- Implemented PostgreSQL connection pooling with SSL configuration for production environments
+- Added comprehensive schema initialization and migration utilities
+- Enhanced database abstraction layer with transaction support for both SQLite and PostgreSQL
+- Updated all service functions to work seamlessly with the new database backend
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -40,25 +40,27 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Database Migration and Connectivity](#database-migration-and-connectivity)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
+11. [Appendices](#appendices)
 
 ## Introduction
 This document describes the sophisticated weekly pulse generation system that transforms raw app store reviews into curated, actionable insights. The system orchestrates a comprehensive weekly insights pipeline that combines theme analysis with user feedback to generate actionable recommendations. It covers the complete lifecycle from assigned themes to aggregated insights, including sentiment-aware aggregation, LLM-powered note generation, robust content formatting (HTML and plain text), validation and quality assurance, performance optimization for weekly batch processing, and delivery tracking. The system provides practical examples, customization options, and comprehensive error recovery strategies.
 
-**Updated** Enhanced with deduplication logic ensuring unique themes are selected for pulse creation and preventing duplicate theme names in top themes lists.
+**Updated** Enhanced with PostgreSQL connectivity and unified database adapter pattern that supports both SQLite and PostgreSQL backends with seamless migration capabilities.
 
 ## Project Structure
-The weekly pulse system resides in phase-2 and orchestrates multiple sophisticated services:
+The weekly pulse system resides in phase-2 and orchestrates multiple sophisticated services with PostgreSQL connectivity:
 - Advanced theme generation and persistence with configurable windows and deduplication
 - Intelligent review-to-theme assignment with batching and confidence scoring
 - Sophisticated weekly pulse aggregation with sentiment analysis, recommendation generation, and unique theme selection
 - Enhanced email rendering with PII scrubbing and dual-format delivery
 - Automated scheduler with delivery tracking and retry mechanisms
-- Comprehensive database schema supporting themes, assignments, pulses, preferences, and job scheduling
+- Unified database adapter supporting both SQLite and PostgreSQL backends
+- Comprehensive PostgreSQL schema with connection pooling and SSL configuration
 - Theme cleanup utilities for maintaining data integrity
 
 ```mermaid
@@ -71,12 +73,14 @@ subgraph "Domain Layer"
 REVIEW["review.ts<br/>Review Models"]
 end
 subgraph "Database Layer"
-DBIDX["db/index.ts<br/>Schema & Migrations"]
+DBADAPTER["dbAdapter.ts<br/>Unified Database Adapter<br/>PostgreSQL & SQLite Support"]
+POSTGRES["postgres.ts<br/>PostgreSQL Connection Pool<br/>SSL Configuration"]
+DBIDX["db/index.ts<br/>Schema Initialization<br/>Backend Detection"]
 end
 subgraph "Service Layer"
 THEME["themeService.ts<br/>Advanced Theme Generation<br/>Deduplication Logic"]
 ASSIGN["assignmentService.ts<br/>Intelligent Assignment"]
-PULSE["pulseService.ts<br/>Sophisticated Pulse Generation<br/>Unique Theme Selection"]
+PULSE["pulseService.ts<br/>Sophisticated Pulse Generation<br/>Async/Await Pattern"]
 EMAIL["emailService.ts<br/>Enhanced Email Delivery"]
 PREFS["userPrefsRepo.ts<br/>Preference Management"]
 GROQ["groqClient.ts<br/>LLM Orchestration"]
@@ -87,19 +91,22 @@ end
 subgraph "Job Layer"
 SCHED["schedulerJob.ts<br/>Automated Scheduling"]
 end
-subgraph "Pipeline Layer"
+subgraph "Migration Layer"
+MIGRATE["migrateToPostgres.ts<br/>SQLite to PostgreSQL Migration"]
 PIPE["runPulsePipeline.ts<br/>End-to-End Processing"]
 end
-ENV --> DBIDX
+ENV --> DBADAPTER
 ENV --> GROQ
 ENV --> EMAIL
 REVIEW --> ASSIGN
-DBIDX --> THEME
-DBIDX --> ASSIGN
-DBIDX --> PULSE
-DBIDX --> PREFS
-DBIDX --> SCHED
-DBIDX --> CLEAN
+DBADAPTER --> THEME
+DBADAPTER --> ASSIGN
+DBADAPTER --> PULSE
+DBADAPTER --> PREFS
+DBADAPTER --> SCHED
+DBADAPTER --> CLEAN
+DBADAPTER --> POSTGRES
+MIGRATE --> POSTGRES
 PIPE --> THEME
 PIPE --> ASSIGN
 PIPE --> PULSE
@@ -117,8 +124,10 @@ SCHED --> PREFS
 **Diagram sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
-- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [db/index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
@@ -126,13 +135,14 @@ SCHED --> PREFS
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
 - [piiScrubber.ts:1-29](file://phase-2/src/services/piiScrubber.ts#L1-L29)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
-- [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
+- [schedulerJob.ts:1-99](file://phase-2/src/jobs/schedulerJob.ts#L1-L99)
 - [runPulsePipeline.ts:1-52](file://phase-2/scripts/runPulsePipeline.ts#L1-L52)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 **Section sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [db/index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 
 ## Core Components
 - **Advanced Theme Service**: Generates sophisticated themes from sampled reviews with configurable validity windows, using LLMs with strict schema validation and cost-controlled text sampling. **Enhanced with case-insensitive deduplication to ensure unique theme names**.
@@ -145,6 +155,8 @@ SCHED --> PREFS
 - **Data Protection**: Implements comprehensive PII scrubbing across all user-facing content
 - **Observability**: Centralized logging for monitoring and debugging all system operations
 - **Theme Cleanup Utilities**: **New component for maintaining theme data integrity through duplicate detection and removal**
+- **Unified Database Adapter**: **New component providing seamless abstraction between SQLite and PostgreSQL backends with automatic placeholder conversion and transaction support**
+- **PostgreSQL Connection Pool**: **New component managing connection pooling, SSL configuration, and schema initialization for production deployments**
 
 **Section sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
@@ -156,9 +168,11 @@ SCHED --> PREFS
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [piiScrubber.ts:22-28](file://phase-2/src/services/piiScrubber.ts#L22-L28)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
+- [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 
 ## Architecture Overview
-The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation with unique theme selection, and automated delivery with tracking.
+The system implements a sophisticated pipeline architecture that processes app store reviews through multiple stages of analysis and transformation. The pipeline follows a structured workflow: data ingestion and preparation, theme generation, intelligent assignment, comprehensive pulse creation with unique theme selection, and automated delivery with tracking. **The architecture now supports both SQLite and PostgreSQL backends through a unified adapter pattern with automatic migration capabilities**.
 
 ```mermaid
 sequenceDiagram
@@ -170,7 +184,7 @@ participant Theme as "Theme Service<br/>Analysis"
 participant Assign as "Assignment Service<br/>Classification"
 participant LLM as "Groq Client<br/>AI Orchestration"
 participant Mail as "Email Service<br/>Delivery"
-participant DB as "Database<br/>Persistence"
+participant DB as "Database Adapter<br/>Unified Backend"
 Cron->>Pref : listDuePrefs(now)<br/>Identify recipients
 Pref-->>Cron : due preferences<br/>Active users
 loop For each due preference
@@ -211,7 +225,7 @@ end
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
-- [db/index.ts:41-88](file://phase-2/src/db/index.ts#L41-L88)
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 ## Detailed Component Analysis
 
@@ -247,7 +261,7 @@ sequenceDiagram
 participant Repo as "Reviews Repository<br/>Data Access"
 participant Assign as "Assignment Service<br/>Processing Engine"
 participant LLM as "Groq Client<br/>AI Classification"
-participant DB as "Database<br/>Persistence"
+participant DB as "Database Adapter<br/>Unified Backend"
 Repo-->>Assign : listReviewsForWeek(weekStart)<br/>Load weekly reviews
 Repo-->>Assign : listLatestThemes(5)<br/>Get theme definitions
 loop Process Reviews in Batches (Size : 10)
@@ -263,7 +277,7 @@ DB-->>Assign : persisted counts<br/>Transaction results
 - [assignmentService.ts:27-97](file://phase-2/src/services/assignmentService.ts#L27-L97)
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
-- [db/index.ts:24-33](file://phase-2/src/db/index.ts#L24-L33)
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
 - [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
@@ -301,7 +315,7 @@ Save --> End(["Weekly Pulse Generated"])
 - [pulseService.ts:134-172](file://phase-2/src/services/pulseService.ts#L134-L172)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
-- [db/index.ts:41-51](file://phase-2/src/db/index.ts#L41-L51)
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
 - [pulseService.ts:59-74](file://phase-2/src/services/pulseService.ts#L59-L74)
@@ -371,7 +385,7 @@ end
 **Diagram sources**
 - [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
-- [db/index.ts:73-83](file://phase-2/src/db/index.ts#L73-L83)
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 **Section sources**
 - [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
@@ -455,19 +469,96 @@ USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
 ```
 
 **Diagram sources**
-- [db/index.ts:9-88](file://phase-2/src/db/index.ts#L9-L88)
+- [db/index.ts:9-133](file://phase-2/src/db/index.ts#L9-L133)
 
 **Section sources**
-- [db/index.ts:9-88](file://phase-2/src/db/index.ts#L9-L88)
+- [db/index.ts:9-133](file://phase-2/src/db/index.ts#L9-L133)
+
+## Database Migration and Connectivity
+
+### Unified Database Adapter Pattern
+**New Component**: The database adapter provides a seamless abstraction layer that supports both SQLite and PostgreSQL backends with automatic placeholder conversion and transaction handling.
+
+```mermaid
+classDiagram
+class DbAdapter {
+- usePostgres : boolean
+- pool : Pool | null
++constructor()
++query(sql, params) Promise~QueryResult~
++queryOne(sql, params) Promise~any~
++run(sql, params) Promise~Result~
++transaction(callback) Promise~T~
+}
+class TransactionAdapter {
+- client : any
++constructor(client)
++query(sql, params) Promise~QueryResult~
++run(sql, params) Promise~Result~
+}
+DbAdapter --> TransactionAdapter : "creates for PostgreSQL transactions"
+```
+
+**Key Features**:
+- Automatic backend detection via DATABASE_URL environment variable
+- Placeholder conversion from SQLite (?) to PostgreSQL ($1, $2, etc.)
+- Transaction support for both backends with rollback capabilities
+- Consistent API across different database engines
+- Connection pooling for PostgreSQL with SSL configuration
+
+**Diagram sources**
+- [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
+
+### PostgreSQL Connection Management
+**New Component**: The PostgreSQL connection manager handles pool initialization, SSL configuration, and schema management for production deployments.
+
+```mermaid
+flowchart TD
+Start(["PostgreSQL Init"]) --> CheckEnv["Check DATABASE_URL<br/>Environment Variable"]
+CheckEnv --> CreatePool["Create Connection Pool<br/>SSL Configuration"]
+CreatePool --> InitSchema["Initialize Schema<br/>Table Creation"]
+InitSchema --> Ready["Ready for Operations<br/>Connection Pool Active"]
+```
+
+**Diagram sources**
+- [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
+- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
+
+**Section sources**
+- [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+
+### SQLite to PostgreSQL Migration
+**New Component**: The migration utility provides automated data transfer from SQLite to PostgreSQL with conflict resolution and schema preservation.
+
+```mermaid
+sequenceDiagram
+participant Migrate as "Migration Script"
+participant SQLite as "SQLite Database"
+participant PG as "PostgreSQL Database"
+Migrate->>PG : initPostgresSchema()<br/>Create Tables
+Migrate->>SQLite : Read All Records<br/>reviews, themes, etc.
+Migrate->>PG : INSERT ... ON CONFLICT<br/>Transfer Data
+SQLite-->>Migrate : Return Next Record
+PG-->>Migrate : Confirm Insertion
+Migrate->>Migrate : Log Progress<br/>Completion Status
+```
+
+**Diagram sources**
+- [migrateToPostgres.ts:5-111](file://phase-2/scripts/migrateToPostgres.ts#L5-L111)
+
+**Section sources**
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 ## Dependency Analysis
 The system demonstrates excellent architectural principles with strong cohesion and minimal coupling. Dependencies are carefully managed to ensure maintainability and testability.
 
 - **Cohesion**: Each service encapsulates specific responsibilities with clear boundaries and focused functionality
 - **Coupling**: Minimal cross-service dependencies with standardized interfaces and shared clients
-- **External Integrations**: Robust integration with Groq for LLM capabilities, Nodemailer for email delivery, and better-sqlite3 for data persistence
+- **External Integrations**: Robust integration with Groq for LLM capabilities, Nodemailer for email delivery, and PostgreSQL for data persistence
 - **Resilience**: Comprehensive retry mechanisms, error handling, and graceful degradation strategies
-- **Data Integrity**: **Enhanced with theme cleanup utilities and deduplication logic for consistent data quality**
+- **Data Integrity**: **Enhanced with theme cleanup utilities, deduplication logic, and unified database adapter for consistent data quality**
+- **Backend Flexibility**: **New unified adapter pattern supports seamless migration between SQLite and PostgreSQL**
 
 ```mermaid
 graph LR
@@ -480,30 +571,35 @@ J["schedulerJob.ts<br/>Automation"] --> P
 J --> E
 J --> U["userPrefsRepo.ts<br/>Preference Management"]
 R["reviewsRepo.ts<br/>Data Access"] --> A
-D["db/index.ts<br/>Database Layer"] --> T
-D --> A
-D --> P
-D --> U
-D --> J
-C["cleanupDuplicateThemes.ts<br/>Theme Integrity"] --> D
+DA["dbAdapter.ts<br/>Unified Database Adapter"] --> T
+DA --> A
+DA --> P
+DA --> U
+DA --> J
+C["cleanupDuplicateThemes.ts<br/>Theme Integrity"] --> DA
+PG["postgres.ts<br/>PostgreSQL Manager"] --> DA
+M["migrateToPostgres.ts<br/>Migration Utility"] --> PG
 ```
 
 **Diagram sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [piiScrubber.ts:1-29](file://phase-2/src/services/piiScrubber.ts#L1-L29)
-- [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
+- [schedulerJob.ts:1-99](file://phase-2/src/jobs/schedulerJob.ts#L1-L99)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 **Section sources**
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 
 ## Performance Considerations
 The system implements comprehensive performance optimizations designed for weekly batch processing scenarios:
@@ -515,6 +611,8 @@ The system implements comprehensive performance optimizations designed for weekl
 - **Concurrency Control**: Sequential processing per scheduler tick prevents resource contention while allowing for horizontal scaling
 - **Caching Strategy**: Theme caching and review batching minimize redundant database queries and LLM calls
 - **Deduplication Efficiency**: **Case-insensitive deduplication uses Set-based lookups for O(n) performance in theme name filtering**
+- **Connection Pooling**: **PostgreSQL connection pooling with SSL configuration optimizes database connections for production deployments**
+- **Placeholder Conversion**: **Automatic SQL placeholder conversion eliminates backend-specific query differences and improves maintainability**
 
 ## Troubleshooting Guide
 Comprehensive troubleshooting guidance for common operational issues:
@@ -541,6 +639,12 @@ Comprehensive troubleshooting guidance for common operational issues:
 - Email delivery failures: Check recipient addresses, spam filtering, and email provider restrictions
 - Job tracking inconsistencies: Review scheduled_jobs table for proper status updates and error logging
 
+**Database Connectivity Issues**
+- **PostgreSQL connection failures**: Verify DATABASE_URL environment variable and SSL configuration
+- **Connection pool exhaustion**: Monitor pool size and connection usage patterns
+- **Migration errors**: Check migration script logs and ensure all tables are properly initialized
+- **Backend switching issues**: Ensure DATABASE_URL is set for PostgreSQL or DATABASE_FILE for SQLite
+
 **Theme Integrity Issues**
 - **Duplicate themes detected**: Run the cleanupDuplicateThemes script to resolve naming conflicts
 - **Case sensitivity problems**: The deduplication logic handles case-insensitive comparisons automatically
@@ -553,9 +657,11 @@ Comprehensive troubleshooting guidance for common operational issues:
 - [emailService.ts:99-102](file://phase-2/src/services/emailService.ts#L99-L102)
 - [schedulerJob.ts:75-80](file://phase-2/src/jobs/schedulerJob.ts#L75-L80)
 - [cleanupDuplicateThemes.ts:10-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L10-L59)
+- [postgres.ts:8-18](file://phase-2/src/db/postgres.ts#L8-L18)
+- [migrateToPostgres.ts:104-107](file://phase-2/scripts/migrateToPostgres.ts#L104-L107)
 
 ## Conclusion
-The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. **The addition of deduplication logic ensures unique themes are selected for pulse creation, preventing duplicate theme names in top themes lists and improving data quality**. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
+The enhanced weekly pulse generation system represents a sophisticated solution for transforming app store reviews into actionable business insights. The system successfully orchestrates a comprehensive pipeline that combines advanced theme analysis with intelligent assignment, sentiment-aware aggregation, and LLM-powered recommendations. **The addition of PostgreSQL connectivity through a unified database adapter enables seamless deployment in production environments with connection pooling and SSL configuration**. **The system now supports both SQLite for development and PostgreSQL for production with automatic migration capabilities**. **The addition of deduplication logic ensures unique themes are selected for pulse creation, preventing duplicate theme names in top themes lists and improving data quality**. Through robust validation, comprehensive quality assurance, and automated delivery tracking, the system ensures reliable operation while maintaining high standards for data safety and user privacy. The modular architecture supports future enhancements and provides a solid foundation for scalable growth.
 
 ## Appendices
 
@@ -587,12 +693,20 @@ The enhanced weekly pulse generation system represents a sophisticated solution 
 - **Monitor for case-sensitive duplicates using the deduplication logic**
 - **Prevent theme name conflicts before pulse generation begins**
 
+**PostgreSQL Deployment**
+- **Set DATABASE_URL environment variable for PostgreSQL connectivity**
+- **Use connection pooling with SSL configuration for production deployments**
+- **Run migration script to transfer data from SQLite to PostgreSQL**
+- **Monitor connection pool health and performance metrics**
+
 **Section sources**
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 - [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
 - [emailService.ts:9-62](file://phase-2/src/services/emailService.ts#L9-L62)
 - [userPrefsRepo.ts:62-77](file://phase-2/src/services/userPrefsRepo.ts#L62-L77)
 - [cleanupDuplicateThemes.ts:1-59](file://phase-2/scripts/cleanupDuplicateThemes.ts#L1-L59)
+- [postgres.ts:8-18](file://phase-2/src/db/postgres.ts#L8-L18)
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 ### Validation and Quality Assurance
 The system implements comprehensive validation mechanisms ensuring data integrity and quality:
@@ -609,6 +723,7 @@ The system implements comprehensive validation mechanisms ensuring data integrit
 - Confidence threshold validation for assignment accuracy
 - Duplicate detection and version management for pulse consistency
 - **Case-insensitive theme name deduplication prevents duplicate entries in top themes**
+- **PostgreSQL schema validation ensures table integrity and proper indexing**
 
 **Testing Framework**
 - Unit tests covering PII redaction effectiveness and content sanitization
@@ -616,6 +731,7 @@ The system implements comprehensive validation mechanisms ensuring data integrit
 - Email content testing for HTML and plain-text formatting accuracy
 - Assignment persistence testing with database constraint validation
 - **Theme deduplication testing for unique name filtering**
+- **Database adapter testing for backend switching and transaction handling**
 
 **Section sources**
 - [pulseService.ts:42-48](file://phase-2/src/services/pulseService.ts#L42-L48)
@@ -629,9 +745,11 @@ The system implements comprehensive validation mechanisms ensuring data integrit
 Critical configuration requirements for system operation:
 
 **Database Configuration**
-- SQLite database file path defaults to phase-1 database location
-- Migration scripts ensure schema compatibility across deployments
-- Connection pooling optimized for concurrent access patterns
+- **DATABASE_URL environment variable required for PostgreSQL connectivity**
+- **SQLite database file path defaults to phase-1 database location**
+- **Migration scripts ensure schema compatibility across deployments**
+- **Connection pooling optimized for concurrent access patterns**
+- **SSL configuration enabled for Render PostgreSQL compatibility**
 
 **AI Integration Settings**
 - Groq API key required for LLM-powered operations
@@ -645,6 +763,7 @@ Critical configuration requirements for system operation:
 
 **Section sources**
 - [env.ts:9-21](file://phase-2/src/config/env.ts#L9-L21)
+- [postgres.ts:8-18](file://phase-2/src/db/postgres.ts#L8-L18)
 
 ### Deduplication Implementation Details
 **Enhanced Component**: The deduplication logic in pulseService.ts ensures unique themes are selected for weekly pulse generation:
@@ -675,3 +794,28 @@ const effectiveTopThemes: ThemeSummary[] =
 
 **Section sources**
 - [pulseService.ts:200-215](file://phase-2/src/services/pulseService.ts#L200-L215)
+
+### Database Adapter Implementation Details
+**New Component**: The database adapter provides seamless abstraction between SQLite and PostgreSQL backends:
+
+```typescript
+// PostgreSQL placeholder conversion
+let pgSql = sql;
+let paramIndex = 1;
+while (pgSql.includes('?')) {
+  pgSql = pgSql.replace('?', `$${paramIndex}`);
+  paramIndex++;
+}
+```
+
+**Key Features**:
+- **Automatic backend detection**: Uses DATABASE_URL environment variable
+- **Placeholder conversion**: Converts SQLite (?) to PostgreSQL ($1, $2, etc.)
+- **Transaction support**: Provides rollback capabilities for both backends
+- **Consistent API**: Same interface regardless of underlying database
+- **Connection pooling**: Optimized for PostgreSQL production deployments
+
+**Section sources**
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
+- [dbAdapter.ts:102-124](file://phase-2/src/db/dbAdapter.ts#L102-L124)
+- [postgres.ts:13-18](file://phase-2/src/db/postgres.ts#L13-L18)

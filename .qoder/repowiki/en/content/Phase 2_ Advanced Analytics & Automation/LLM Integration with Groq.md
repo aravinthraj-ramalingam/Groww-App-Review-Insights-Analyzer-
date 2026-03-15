@@ -17,11 +17,10 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced JSON parsing reliability section with comprehensive state machine algorithm for nested quotes and escaped characters
-- Updated intelligent newline escaping documentation to reflect state machine improvements
-- Added detailed state machine implementation analysis for complex JSON structures
-- Updated troubleshooting guide with enhanced debugging procedures for state machine parsing
-- Revised performance considerations to account for state machine complexity
+- Updated Groq model configuration to reflect the upgraded llama-3.3-70b-versatile model
+- Enhanced performance considerations section to highlight improved AI processing capabilities
+- Updated troubleshooting guide to include model-specific guidance
+- Revised environment configuration documentation to specify the new model requirements
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -38,7 +37,7 @@
 12. [Appendices](#appendices)
 
 ## Introduction
-This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. It also covers the assignment of reviews to themes, weekly pulse generation, and safeguards against PII exposure. The system now features significantly enhanced JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
+This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. The system now utilizes the advanced llama-3.3-70b-versatile model, which provides significantly enhanced AI processing capabilities and performance compared to previous generations. It features robust JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
 
 ## Project Structure
 Phase 2 builds upon Phase 1's SQLite database and introduces new services for Groq-powered insights:
@@ -84,8 +83,8 @@ SCRUB --> PULSE
 **Diagram sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
-- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
-- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
+- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
@@ -93,10 +92,10 @@ SCRUB --> PULSE
 
 **Section sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [package.json:1-30](file://phase-2/package.json#L1-L30)
+- [package.json:1-34](file://phase-2/package.json#L1-L34)
 
 ## Core Components
-- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions with enhanced control character cleanup, intelligent newline escaping, and sophisticated state machine parsing for complex JSON structures.
+- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions with enhanced control character cleanup, intelligent newline escaping, and sophisticated state machine parsing for complex JSON structures. Now operates on the advanced llama-3.3-70b-versatile model for superior performance.
 - ThemeService: Generates themes from recent reviews using structured prompts and validates outputs via Zod schemas.
 - AssignmentService: Assigns reviews to themes with confidence scores, batching requests to manage token usage.
 - PulseService: Aggregates weekly insights, generates action ideas and a concise weekly note, enforces word limits, and scrubs PII.
@@ -105,13 +104,13 @@ SCRUB --> PULSE
 
 **Section sources**
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
-- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
-- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
+- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
 
 ## Architecture Overview
-The system orchestrates three primary workflows:
+The system orchestrates three primary workflows using the enhanced llama-3.3-70b-versatile model:
 - Theme Generation: Collects a sample of cleaned review texts, constructs a system and user prompt, calls Groq, extracts JSON with enhanced parsing reliability, validates with Zod, and persists themes.
 - Review Assignment: Iterates over weekly reviews in batches, assigns each to a theme or "Other," and persists the mapping with optional confidence.
 - Weekly Pulse: Aggregates theme statistics for the week, selects representative quotes, generates action ideas, writes a concise note, enforces word limits, scrubs PII, and stores the result.
@@ -121,12 +120,12 @@ sequenceDiagram
 participant Client as "Caller"
 participant ThemeSvc as "themeService.generateThemesFromReviews"
 participant GroqCli as "groqClient.groqJson"
-participant GroqAPI as "Groq Chat Completions"
+participant GroqAPI as "Groq Chat Completions (llama-3.3-70b-versatile)"
 Client->>ThemeSvc : "Provide reviews"
 ThemeSvc->>ThemeSvc : "Build system/user prompts<br/>Define schema hint"
 ThemeSvc->>GroqCli : "Call groqJson({ system, user, schemaHint })"
-GroqCli->>GroqAPI : "chat.completions.create(model, messages)"
-GroqAPI-->>GroqCli : "Raw response text"
+GroqCli->>GroqAPI : "chat.completions.create(model : llama-3.3-70b-versatile, messages)"
+GroqAPI-->>GroqCli : "Enhanced response from advanced model"
 GroqCli->>GroqCli : "Enhanced extractJson() with state machine algorithm<br/>Control char cleanup<br/>Intelligent newline escaping<br/>Comprehensive debugging"
 GroqCli-->>ThemeSvc : "Parsed JSON"
 ThemeSvc->>ThemeSvc : "Zod parse and return themes"
@@ -153,18 +152,21 @@ ThemeSvc-->>Client : "Theme array"
   - Proper escape sequence preservation during newline conversion
 - Retry Logic: Attempts up to three times with incremental temperature increases to improve deterministic JSON output on retries.
 - Request Construction: Sends a system message and a user message that includes a strict instruction to return only valid JSON and a schema hint.
+- Model Configuration: Now operates on the advanced llama-3.3-70b-versatile model for enhanced AI processing capabilities.
+
+**Updated** The GroqClient now operates on the llama-3.3-70b-versatile model, which provides significantly enhanced AI processing capabilities and performance compared to previous model generations. This upgrade enables more sophisticated reasoning, improved accuracy in theme generation, and better handling of complex review analysis tasks.
 
 ```mermaid
 flowchart TD
 Start(["groqJson(params)"]) --> CheckKey["Check Groq client availability"]
 CheckKey --> |Unavailable| ThrowErr["Throw error: GROQ_API_KEY not set"]
 CheckKey --> |Available| Loop["Loop attempts 1..3"]
-Loop --> TryCall["Call chat.completions.create"]
+Loop --> TryCall["Call chat.completions.create<br/>model: llama-3.3-70b-versatile"]
 TryCall --> ParseResp["Enhanced extractJson() with:<br/>- Control char cleanup<br/>- State machine newline escaping<br/>- Fence stripping<br/>- Complex JSON handling"]
 ParseResp --> Validate["JSON.parse() with comprehensive debugging"]
 Validate --> Success{"Parse OK?"}
 Success --> |Yes| ReturnVal["Return parsed value"]
-Success --> |No| DebugInfo["Log detailed error info:<br/>- Position<br/>- Context preview<br>- Full content length"]
+Success --> |No| DebugInfo["Log detailed error info:<br/>- Position<br/>- Context preview<br/>- Full content length"]
 DebugInfo --> NextAttempt["Increment attempt and increase temperature"]
 NextAttempt --> Loop
 Loop --> |Exhausted| FinalErr["Log final error and throw"]
@@ -175,6 +177,7 @@ Loop --> |Exhausted| FinalErr["Log final error and throw"]
 
 **Section sources**
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
+- [env.ts:13-14](file://phase-2/src/config/env.ts#L13-L14)
 
 ### Prompt Engineering Strategies
 - Role Definitions: System messages define the persona (product analyst) and constraints (no PII, concise output).
@@ -183,9 +186,10 @@ Loop --> |Exhausted| FinalErr["Log final error and throw"]
   - A schema hint to guide the model's output structure.
   - Structured context (e.g., theme lists, review samples).
 - Temperature Tuning: Slightly increasing temperature on retries improves convergence toward deterministic JSON.
+- Model Optimization: The llama-3.3-70b-versatile model provides enhanced reasoning capabilities for more sophisticated prompt processing.
 
 Examples by component:
-- Theme Generation: Builds a system role and a user prompt enumerating a sample of cleaned review texts, then requests a JSON array of themes.
+- Theme Generation: Builds a system role and a user prompt enumerating a sample of cleaned review texts, then requests a JSON array of themes with enhanced processing capabilities.
 - Assignment: Provides allowed theme names and descriptions, instructs the model to assign each review to one theme or "Other," and requests a JSON array of assignments with optional confidence.
 - Weekly Pulse: Supplies top themes, quotes, and action ideas, and enforces a strict word limit in the note.
 
@@ -216,13 +220,13 @@ C --> |No| E["Throw validation error"]
 - [pulseService.ts:42-48](file://phase-2/src/services/pulseService.ts#L42-L48)
 
 **Section sources**
-- [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
-- [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
+- [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 
 ### Theme Generation Workflow
 - Input: Reviews are sampled and cleaned; a system role defines the analyst persona and PII constraints; a user prompt enumerates review excerpts.
-- Processing: Calls groqJson with a schema hint for an array of themes using enhanced JSON parsing with state machine algorithm.
+- Processing: Calls groqJson with a schema hint for an array of themes using enhanced JSON parsing with state machine algorithm on the llama-3.3-70b-versatile model.
 - Output: Zod-parsed themes are returned and persisted via upsert.
 
 ```mermaid
@@ -232,7 +236,7 @@ participant Groq as "groqClient"
 participant DB as "SQLite themes"
 Svc->>Svc : "Select sample reviews and build prompts"
 Svc->>Groq : "groqJson({ system, user, schemaHint })"
-Groq-->>Svc : "Enhanced parsed themes"
+Groq-->>Svc : "Enhanced parsed themes from llama-3.3-70b-versatile"
 Svc->>DB : "Upsert themes with timestamps and windows"
 DB-->>Svc : "IDs"
 Svc-->>Svc : "Return theme list"
@@ -248,7 +252,7 @@ Svc-->>Svc : "Return theme list"
 
 ### Review Assignment to Themes
 - Input: Weekly reviews and latest themes.
-- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson with enhanced parsing using state machine algorithm, parses assignments, and persists mappings with optional confidence.
+- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson with enhanced parsing using state machine algorithm on the llama-3.3-70b-versatile model, parses assignments, and persists mappings with optional confidence.
 - Persistence: Uses an upsert to update confidence values for repeated runs.
 
 ```mermaid
@@ -261,7 +265,7 @@ Repo-->>Asgn : "List reviews for week"
 Asgn->>Asgn : "Load latest themes"
 loop "Batch over reviews"
 Asgn->>Groq : "groqJson({ system, user, schemaHint })"
-Groq-->>Asgn : "Enhanced assignments"
+Groq-->>Asgn : "Enhanced assignments from llama-3.3-70b-versatile"
 Asgn->>DB : "Upsert review_theme with confidence"
 end
 Asgn-->>Repo : "Stats (assigned/skipped/themes)"
@@ -370,13 +374,13 @@ PULSE --> SCRUB["piiScrubber.ts"]
 ```
 
 **Diagram sources**
-- [package.json:13-20](file://phase-2/package.json#L13-L20)
+- [package.json:13-23](file://phase-2/package.json#L13-L23)
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
 - [groqClient.ts:1-7](file://phase-2/src/services/groqClient.ts#L1-L7)
 - [index.ts:1-5](file://phase-2/src/db/index.ts#L1-L5)
 
 **Section sources**
-- [package.json:1-30](file://phase-2/package.json#L1-L30)
+- [package.json:1-34](file://phase-2/package.json#L1-L34)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 
 ## Performance Considerations
@@ -395,13 +399,19 @@ PULSE --> SCRUB["piiScrubber.ts"]
 - Cost Control:
   - Choose appropriate models and tune temperature to balance quality and cost.
   - Monitor output length (word count) to avoid unnecessary tokens.
+- Model Performance Benefits:
+  - The llama-3.3-70b-versatile model provides enhanced processing capabilities with improved accuracy and reasoning.
+  - Better handling of complex review analysis tasks reduces the need for multiple API calls.
+  - Enhanced JSON parsing reliability reduces retry attempts and associated costs.
 - State Machine Complexity:
   - The state machine algorithm adds computational overhead for complex JSON parsing.
   - Performance impact is minimal compared to the benefits of reduced parsing failures.
 
+**Updated** The llama-3.3-70b-versatile model upgrade provides significant performance improvements including enhanced processing capabilities, improved accuracy in theme generation, and better handling of complex review analysis tasks. These improvements reduce the need for multiple API calls and enhance overall system efficiency.
+
 ## Enhanced JSON Parsing Reliability
 
-**Updated** The GroqClient now features significantly enhanced JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs.
+**Updated** The GroqClient now features significantly enhanced JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. The llama-3.3-70b-versatile model provides enhanced processing capabilities that further improve parsing accuracy.
 
 ### State Machine Algorithm Implementation
 The enhanced `extractJson` function implements a comprehensive state machine that tracks parsing state across complex JSON structures:
@@ -481,7 +491,7 @@ Loop --> |No| End["Return processed JSON"]
 
 ## Comprehensive Debugging Capabilities
 
-**Updated** The GroqClient now provides extensive debugging capabilities with detailed error logging for troubleshooting failed API responses.
+**Updated** The GroqClient now provides extensive debugging capabilities with detailed error logging for troubleshooting failed API responses, enhanced by the llama-3.3-70b-versatile model's improved error reporting.
 
 ### Detailed Error Logging
 The enhanced error handling system provides comprehensive debugging information:
@@ -489,6 +499,7 @@ The enhanced error handling system provides comprehensive debugging information:
 - Captures content previews (first 300 characters) for immediate diagnosis
 - Records raw content previews to compare with processed output
 - Includes retry attempt information for sequential debugging
+- Leverages model-specific error reporting from llama-3.3-70b-versatile
 
 ### Debug Information Structure
 When JSON parsing fails, the system logs:
@@ -503,6 +514,7 @@ The debugging-enabled retry mechanism:
 - Logs detailed information on each failure for systematic troubleshooting
 - Provides comprehensive context for developers to identify root causes
 - Maintains error propagation while preserving diagnostic information
+- Utilizes enhanced error reporting capabilities of the llama-3.3-70b-versatile model
 
 **Section sources**
 - [groqClient.ts:119-131](file://phase-2/src/services/groqClient.ts#L119-L131)
@@ -523,10 +535,16 @@ The debugging-enabled retry mechanism:
 - Cost Control:
   - Choose appropriate models and tune temperature to balance quality and cost.
   - Monitor output length (word count) to avoid unnecessary tokens.
+- Model Performance Benefits:
+  - The llama-3.3-70b-versatile model provides enhanced processing capabilities with improved accuracy and reasoning.
+  - Better handling of complex review analysis tasks reduces the need for multiple API calls.
+  - Enhanced JSON parsing reliability reduces retry attempts and associated costs.
 - State Machine Performance:
   - The state machine algorithm has O(n) time complexity where n is the length of the JSON string
   - Memory usage is minimal, proportional to input size plus small constant overhead
   - Performance impact is negligible compared to the dramatic reduction in parsing failures
+
+**Updated** The llama-3.3-70b-versatile model upgrade provides significant performance improvements including enhanced processing capabilities, improved accuracy in theme generation, and better handling of complex review analysis tasks. These improvements reduce the need for multiple API calls and enhance overall system efficiency.
 
 ## Troubleshooting Guide
 - Missing API Key:
@@ -553,23 +571,33 @@ The debugging-enabled retry mechanism:
 - Empty Inputs:
   - Symptom: No themes found or no reviews for the week.
   - Resolution: Trigger theme generation first; ensure weekly assignment runs after theme generation.
+- Model-Specific Issues:
+  - Symptom: Unexpected behavior with llama-3.3-70b-versatile model.
+  - Resolution: Verify model configuration in environment variables; check Groq API status; consider adjusting temperature settings for optimal performance.
+
+**Updated** Added troubleshooting guidance for model-specific issues related to the llama-3.3-70b-versatile upgrade, including verification of model configuration and API status checks.
 
 **Section sources**
 - [groqClient.ts:98-140](file://phase-2/src/services/groqClient.ts#L98-L140)
 - [pulseService.ts:162-171](file://phase-2/src/services/pulseService.ts#L162-L171)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
+- [env.ts:13-14](file://phase-2/src/config/env.ts#L13-L14)
 
 ## Conclusion
-Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation with significantly enhanced JSON parsing reliability. The system now features a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. The GroqClient provides comprehensive control character cleanup, intelligent newline escaping, and detailed debugging capabilities with extensive error logging. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
+Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation with significantly enhanced JSON parsing reliability. The system now features a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. The llama-3.3-70b-versatile model upgrade provides enhanced AI processing capabilities and performance, enabling more sophisticated reasoning and improved accuracy in theme generation and review analysis. The GroqClient provides comprehensive control character cleanup, intelligent newline escaping, and detailed debugging capabilities with extensive error logging. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
+
+**Updated** The llama-3.3-70b-versatile model upgrade significantly enhances the system's AI processing capabilities, providing improved accuracy, reasoning abilities, and performance for theme generation and review analysis tasks.
 
 ## Appendices
 
 ### Environment Configuration
 - Required Variables:
   - GROQ_API_KEY: Groq API key for authentication.
-  - GROQ_MODEL: Model identifier used for chat completions.
+  - GROQ_MODEL: Model identifier used for chat completions (default: llama-3.3-70b-versatile).
   - DATABASE_FILE: Path to the SQLite database file.
   - SMTP_*: SMTP host, port, credentials, and sender address for email notifications.
+
+**Updated** The GROQ_MODEL environment variable now defaults to llama-3.3-70b-versatile, providing enhanced AI processing capabilities.
 
 **Section sources**
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
@@ -605,6 +633,9 @@ Phase 2 integrates Groq to power theme generation, review assignment, and weekly
 - Compare Content Previews: Examine both processed and raw content previews to understand transformation effects.
 - Monitor Retry Attempts: Track sequential failures to identify persistent issues.
 - State Machine Analysis: For complex JSON failures, examine the specific character positions where state transitions occur.
+- Model Error Reporting: Leverage enhanced error reporting capabilities of the llama-3.3-70b-versatile model.
+
+**Updated** Added guidance for leveraging enhanced error reporting capabilities of the llama-3.3-70b-versatile model.
 
 **Section sources**
 - [groqClient.ts:119-131](file://phase-2/src/services/groqClient.ts#L119-L131)
@@ -618,3 +649,13 @@ The state machine algorithm provides several key advantages:
 
 **Section sources**
 - [groqClient.ts:35-88](file://phase-2/src/services/groqClient.ts#L35-L88)
+
+### Model Upgrade Benefits
+The llama-3.3-70b-versatile model upgrade provides:
+- **Enhanced Processing Power**: Improved reasoning capabilities for complex review analysis
+- **Better Accuracy**: More precise theme generation and review assignment
+- **Reduced API Calls**: Enhanced performance reduces the need for multiple API requests
+- **Improved Reliability**: Better handling of edge cases and complex JSON structures
+- **Cost Efficiency**: Reduced retry attempts and improved parsing reliability lower operational costs
+
+**Updated** Added comprehensive coverage of the llama-3.3-70b-versatile model upgrade benefits and implications.

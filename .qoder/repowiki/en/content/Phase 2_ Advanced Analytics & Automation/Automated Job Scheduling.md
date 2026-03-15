@@ -13,6 +13,8 @@
 - [env.ts](file://phase-2/src/config/env.ts)
 - [logger.ts](file://phase-2/src/core/logger.ts)
 - [index.ts](file://phase-2/src/db/index.ts)
+- [dbAdapter.ts](file://phase-2/src/db/dbAdapter.ts)
+- [postgres.ts](file://phase-2/src/db/postgres.ts)
 - [runPulsePipeline.ts](file://phase-2/scripts/runPulsePipeline.ts)
 - [scheduler.test.ts](file://phase-2/src/tests/scheduler.test.ts)
 </cite>
@@ -24,6 +26,7 @@
 - Implemented robust job tracking with detailed status monitoring
 - Added retry mechanisms and error handling for failed deliveries
 - Improved observability with enhanced logging and status tracking
+- **Updated**: Integrated database adapter for improved database abstraction and consistency across both SQLite and PostgreSQL implementations
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -31,11 +34,12 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
-10. [Appendices](#appendices)
+6. [Database Abstraction Layer](#database-abstraction-layer)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
+11. [Appendices](#appendices)
 
 ## Introduction
 This document describes the enhanced automated job scheduling system responsible for generating and delivering a weekly product insights pulse with 24/7 availability. The system orchestrates a comprehensive pipeline that:
@@ -45,8 +49,9 @@ This document describes the enhanced automated job scheduling system responsible
 - Sends the pulse via email to subscribed users with robust retry mechanisms
 - Tracks job status and logs outcomes for comprehensive observability
 - Implements intelligent retry strategies for failed deliveries
+- **Updated**: Provides database abstraction layer for seamless SQLite and PostgreSQL integration
 
-The scheduler now operates continuously with enhanced timezone awareness, supporting global users with flexible delivery preferences while maintaining UTC-based scheduling precision.
+The scheduler now operates continuously with enhanced timezone awareness, supporting global users with flexible delivery preferences while maintaining UTC-based scheduling precision. The new database adapter ensures consistent behavior across different database backends.
 
 ## Project Structure
 The enhanced scheduling system spans several modules with improved architecture:
@@ -55,6 +60,7 @@ The enhanced scheduling system spans several modules with improved architecture:
 - Comprehensive pulse generation: aggregates themes, quotes, and action ideas with enhanced validation
 - Robust email service: builds and sends HTML/text emails with retry capabilities
 - Supporting services: theme generation, assignment, and review retrieval with improved error handling
+- **Updated**: Database abstraction layer: unified interface for SQLite and PostgreSQL with automatic placeholder conversion
 - API server: exposes endpoints and starts the enhanced scheduler with monitoring capabilities
 - Configuration and logging: environment variables and comprehensive console logging
 - Database: schema and tables for themes, pulses, preferences, and detailed job tracking
@@ -77,8 +83,12 @@ end
 subgraph "Reliable Delivery"
 ES["emailService.ts"]
 end
+subgraph "Database Abstraction Layer"
+DA["dbAdapter.ts"]
+PG["postgres.ts"]
+IDX["db/index.ts"]
+end
 subgraph "Comprehensive Persistence"
-DB["db/index.ts"]
 CFG["env.ts"]
 LOG["logger.ts"]
 end
@@ -89,10 +99,14 @@ PS --> TS
 PS --> AS
 AS --> RR
 SJ --> ES
-SJ --> DB
-PS --> DB
-ES --> CFG
-Srv --> DB
+SJ --> DA
+PS --> DA
+AS --> DA
+RR --> DA
+TS --> DA
+DA --> PG
+DA --> IDX
+Srv --> DA
 Srv --> LOG
 ```
 
@@ -105,6 +119,8 @@ Srv --> LOG
 - [assignmentService.ts:102-113](file://phase-2/src/services/assignmentService.ts#L102-L113)
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
+- [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
+- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
 - [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
@@ -113,12 +129,14 @@ Srv --> LOG
 - [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 
@@ -144,6 +162,11 @@ Srv --> LOG
   - Theme generation: uses LLM to propose themes from recent reviews with validation
   - Assignment: assigns reviews to themes and persists mappings with batch processing
   - Reviews repository: loads recent and weekly reviews with enhanced filtering
+- **Updated**: Database abstraction layer with unified interface
+  - Provides consistent API for both SQLite and PostgreSQL implementations
+  - Automatically converts SQL placeholders from SQLite (?) to PostgreSQL ($1, $2, etc.)
+  - Supports transactions, query execution, and result handling across different databases
+  - Ensures data consistency and type safety across database backends
 - API server with monitoring capabilities
   - Initializes schema, exposes endpoints for themes, pulses, preferences, and email testing
   - Starts the enhanced scheduler loop continuously when the LLM API key is configured
@@ -154,27 +177,29 @@ Srv --> LOG
 **Section sources**
 - [schedulerJob.ts:7-98](file://phase-2/src/jobs/schedulerJob.ts#L7-L98)
 - [userPrefsRepo.ts:17-94](file://phase-2/src/services/userPrefsRepo.ts#L17-L94)
-- [pulseService.ts:176-264](file://phase-2/src/services/pulseService.ts#L176-L264)
+- [pulseService.ts:176-270](file://phase-2/src/services/pulseService.ts#L176-L270)
 - [emailService.ts:99-129](file://phase-2/src/services/emailService.ts#L99-L129)
-- [themeService.ts:17-56](file://phase-2/src/services/themeService.ts#L17-L56)
-- [assignmentService.ts:27-113](file://phase-2/src/services/assignmentService.ts#L27-L113)
+- [themeService.ts:17-78](file://phase-2/src/services/themeService.ts#L17-L78)
+- [assignmentService.ts:27-114](file://phase-2/src/services/assignmentService.ts#L27-L114)
 - [reviewsRepo.ts:4-24](file://phase-2/src/services/reviewsRepo.ts#L4-L24)
+- [dbAdapter.ts:13-178](file://phase-2/src/db/dbAdapter.ts#L13-L178)
 - [server.ts:334-346](file://phase-2/src/api/server.ts#L334-L346)
 - [env.ts:7-21](file://phase-2/src/config/env.ts#L7-L21)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 
 ## Architecture Overview
-The enhanced system follows a robust 24/7 continuous polling model with comprehensive error handling:
+The enhanced system follows a robust 24/7 continuous polling model with comprehensive error handling and database abstraction:
 - The API server initializes the database schema and starts the enhanced scheduler loop
 - The scheduler runs continuously at fixed intervals, checking for due preferences across all timezones
 - For each due preference, it computes the last full week, creates a scheduled job row, generates the pulse, sends the email with retry mechanisms, and updates the job status
 - The system implements comprehensive logging and monitoring for all operations
+- **Updated**: Database operations are executed through the unified DbAdapter interface, ensuring consistent behavior across SQLite and PostgreSQL
 
 ```mermaid
 sequenceDiagram
 participant Cron as "24/7 Scheduler Loop"
 participant Repo as "userPrefsRepo"
-participant DB as "DB"
+participant DB as "DbAdapter"
 participant Gen as "pulseService"
 participant Mail as "emailService"
 Cron->>Repo : listDuePrefs(nowUtcIso)
@@ -200,7 +225,7 @@ end
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
-- [index.ts:73-88](file://phase-2/src/db/index.ts#L73-L88)
+- [dbAdapter.ts:28-97](file://phase-2/src/db/dbAdapter.ts#L28-L97)
 
 ## Detailed Component Analysis
 
@@ -253,7 +278,7 @@ Wait --> Tick
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
-- [index.ts:73-88](file://phase-2/src/db/index.ts#L73-L88)
+- [dbAdapter.ts:20-41](file://phase-2/src/db/dbAdapter.ts#L20-L41)
 
 **Section sources**
 - [schedulerJob.ts:7-98](file://phase-2/src/jobs/schedulerJob.ts#L7-L98)
@@ -303,7 +328,7 @@ participant PS as "pulseService.generatePulse"
 participant TR as "reviewsRepo"
 participant TS as "themeService"
 participant AS as "assignmentService"
-participant DB as "DB"
+participant DB as "DbAdapter"
 Caller->>PS : generatePulse(weekStart)
 PS->>TS : listLatestThemes(5)
 TS-->>PS : themes
@@ -321,12 +346,12 @@ PS-->>Caller : WeeklyPulse
 **Diagram sources**
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
-- [themeService.ts:58-66](file://phase-2/src/services/themeService.ts#L58-L66)
+- [themeService.ts:67-76](file://phase-2/src/services/themeService.ts#L67-L76)
 - [assignmentService.ts:102-113](file://phase-2/src/services/assignmentService.ts#L102-L113)
-- [index.ts:41-57](file://phase-2/src/db/index.ts#L41-L57)
+- [dbAdapter.ts:59-75](file://phase-2/src/db/dbAdapter.ts#L59-L75)
 
 **Section sources**
-- [pulseService.ts:176-264](file://phase-2/src/services/pulseService.ts#L176-L264)
+- [pulseService.ts:176-270](file://phase-2/src/services/pulseService.ts#L176-L270)
 
 ### Reliable Email Delivery with Retry Mechanisms
 Responsibilities:
@@ -432,10 +457,10 @@ REVIEW_THEMES ||--o{ SCHEDULED_JOBS : "referenced indirectly"
 ```
 
 **Diagram sources**
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [index.ts:7-125](file://phase-2/src/db/index.ts#L7-L125)
 
 **Section sources**
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [index.ts:7-133](file://phase-2/src/db/index.ts#L7-L133)
 
 ### Enhanced API Orchestration and Continuous Startup
 Responsibilities:
@@ -459,26 +484,85 @@ API->>API : Health checks and monitoring
 
 **Diagram sources**
 - [server.ts:334-346](file://phase-2/src/api/server.ts#L334-L346)
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [index.ts:13-18](file://phase-2/src/db/index.ts#L13-L18)
 - [schedulerJob.ts:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
 
 **Section sources**
 - [server.ts:334-346](file://phase-2/src/api/server.ts#L334-L346)
+
+## Database Abstraction Layer
+
+**Updated**: The system now includes a comprehensive database abstraction layer that provides seamless integration between SQLite and PostgreSQL implementations.
+
+### DbAdapter Interface
+The DbAdapter class serves as a unified interface for database operations, automatically detecting the database backend and providing consistent APIs:
+
+- **Automatic Backend Detection**: Determines whether to use PostgreSQL (via DATABASE_URL) or SQLite based on environment configuration
+- **Placeholder Conversion**: Automatically converts SQLite placeholders (`?`) to PostgreSQL placeholders (`$1`, `$2`, etc.) for SQL statements
+- **Consistent Result Handling**: Provides uniform `QueryResult` interface with `rows` and `rowCount` properties across both backends
+- **Transaction Support**: Supports both SQLite and PostgreSQL transactions with rollback capabilities
+
+### PostgreSQL Implementation Features
+- **Connection Pool Management**: Uses connection pooling for efficient database connections
+- **SSL Configuration**: Handles SSL connections with proper rejection settings for cloud platforms
+- **Schema Initialization**: Creates all required tables with appropriate data types and constraints
+- **Index Management**: Automatically creates indexes for optimal query performance
+
+### SQLite Implementation Features
+- **Local Development**: Uses SQLite for local development and testing environments
+- **File-Based Storage**: Stores database in a local file specified by configuration
+- **Simple Setup**: Requires no external database server for development
+
+### Key Database Operations
+- **Query Execution**: Executes SELECT statements with automatic parameter binding
+- **Single Row Queries**: Provides `queryOne` for retrieving single results
+- **Write Operations**: Handles INSERT, UPDATE, DELETE with consistent return values
+- **Transactions**: Supports atomic operations with commit/rollback semantics
+- **Type Safety**: Maintains type consistency across different database backends
+
+```mermaid
+flowchart TD
+A["DbAdapter Constructor"] --> B{"isPostgres()?"}
+B --> |true| C["Initialize PostgreSQL Pool"]
+B --> |false| D["Use SQLite Database"]
+E["query(sql, params)"] --> F{"PostgreSQL?"}
+F --> |true| G["Convert '?' to '$1, $2, etc.'"]
+G --> H["Execute via Pool.query()"]
+F --> |false| I["Execute via db.prepare().all()"]
+J["run(sql, params)"] --> K{"PostgreSQL?"}
+K --> |true| L["Convert placeholders & execute"]
+L --> M["Handle INSERT with lastval()"]
+K --> |false| N["Execute via db.prepare().run()"]
+O["transaction(callback)"] --> P{"PostgreSQL?"}
+P --> |true| Q["BEGIN transaction via client"]
+Q --> R["Execute callback with TransactionAdapter"]
+P --> |false| S["Execute via db.transaction()"]
+```
+
+**Diagram sources**
+- [dbAdapter.ts:17-124](file://phase-2/src/db/dbAdapter.ts#L17-L124)
+- [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
+- [index.ts:13-18](file://phase-2/src/db/index.ts#L13-L18)
+
+**Section sources**
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 
 ## Dependency Analysis
 - Enhanced scheduler depends on:
   - userPrefsRepo for timezone-aware due checks
   - pulseService for content generation with enhanced validation
   - emailService for reliable delivery with retry mechanisms
-  - db for persistence of scheduled_jobs and weekly_pulses with enhanced tracking
+  - **Updated**: dbAdapter for unified database operations across SQLite and PostgreSQL
 - Enhanced pulse generation depends on:
   - themeService for themes with validation
   - assignmentService for review-to-theme assignments with batch processing
   - reviewsRepo for weekly reviews with filtering
-  - db for aggregations and inserts with versioning
+  - **Updated**: dbAdapter for consistent database access patterns
 - API server depends on:
   - schedulerJob for continuous dispatch with monitoring
-  - db for schema initialization with validation
+  - **Updated**: dbAdapter for schema initialization and persistence
   - env for configuration with enhanced settings
   - logger for comprehensive diagnostics
 
@@ -487,7 +571,7 @@ graph LR
 SJ["schedulerJob.ts"] --> UPR["userPrefsRepo.ts"]
 SJ --> PS["pulseService.ts"]
 SJ --> ES["emailService.ts"]
-SJ --> DB["db/index.ts"]
+SJ --> DB["dbAdapter.ts"]
 PS --> TS["themeService.ts"]
 PS --> AS["assignmentService.ts"]
 PS --> RR["reviewsRepo.ts"]
@@ -496,31 +580,37 @@ Srv["server.ts"] --> SJ
 Srv --> DB
 Srv --> CFG["env.ts"]
 Srv --> LOG["logger.ts"]
+DB --> PG["postgres.ts"]
+DB --> IDX["db/index.ts"]
 ```
 
 **Diagram sources**
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 
 **Section sources**
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
-- [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
-- [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
+- [themeService.ts:1-78](file://phase-2/src/services/themeService.ts#L1-L78)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [dbAdapter.ts:1-178](file://phase-2/src/db/dbAdapter.ts#L1-L178)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 
@@ -534,9 +624,11 @@ Srv --> LOG["logger.ts"]
 - LLM usage optimization
   - Theme generation and assignments call an LLM client with enhanced batching. Batch sizes are optimized to manage token usage efficiently.
   - Retry mechanisms handle transient LLM endpoint failures gracefully
-- Database operations
-  - Queries use enhanced indexes on scheduled_jobs for efficient filtering. Ensure adequate indexing and avoid N+1 patterns.
-  - Versioning in weekly_pulses prevents data conflicts and supports historical tracking
+- **Updated**: Database performance considerations
+  - The DbAdapter automatically optimizes SQL execution by converting placeholders and handling database-specific optimizations
+  - Connection pooling in PostgreSQL reduces connection overhead for high-volume operations
+  - SQLite provides fast local development performance with minimal setup overhead
+  - Enhanced indexing on scheduled_jobs and weekly_pulses tables improves query performance
 - Enhanced email throughput
   - SMTP transport is synchronous with retry mechanisms. For high volumes, introduce a queue and worker pattern to decouple sending from the scheduler.
   - Retry strategies with exponential backoff reduce delivery failures
@@ -562,12 +654,18 @@ Enhanced troubleshooting procedures:
   - Inspect the last_error field in scheduled_jobs for the failing job ID.
   - Check retry_pending status for jobs attempting recovery.
   - Monitor retry mechanisms and exponential backoff patterns.
+- **Updated**: Database connectivity issues
+  - Verify DATABASE_URL environment variable is set for PostgreSQL deployments
+  - Check PostgreSQL connection pool configuration and SSL settings
+  - For SQLite, ensure the database file path is accessible and writable
+  - Monitor DbAdapter error logs for database-specific issues
 
 Enhanced operational checks:
 - Use the test email endpoint to validate SMTP configuration with comprehensive error reporting.
 - Use the API endpoints to list recent pulses and inspect stored content with version information.
 - Monitor console logs for enhanced informational and error messages emitted by the scheduler and services.
 - Check scheduled_jobs table for comprehensive status tracking and historical data.
+- **Updated**: Monitor database adapter logs for connection issues and query performance metrics.
 
 **Section sources**
 - [server.ts:334-346](file://phase-2/src/api/server.ts#L334-L346)
@@ -575,9 +673,10 @@ Enhanced operational checks:
 - [userPrefsRepo.ts:83-94](file://phase-2/src/services/userPrefsRepo.ts#L83-L94)
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [dbAdapter.ts:13-22](file://phase-2/src/db/dbAdapter.ts#L13-L22)
 
 ## Conclusion
-The enhanced automated job scheduling system provides comprehensive 24/7 pulse delivery with advanced timezone awareness, robust job tracking, and intelligent retry mechanisms. The system integrates user preferences across global timezones, weekly content generation, and reliable email delivery with comprehensive status tracking and logging. The enhanced architecture supports continuous operation with fault tolerance, making it suitable for enterprise-scale deployment with strict SLAs and high availability requirements.
+The enhanced automated job scheduling system provides comprehensive 24/7 pulse delivery with advanced timezone awareness, robust job tracking, and intelligent retry mechanisms. The system integrates user preferences across global timezones, weekly content generation, and reliable email delivery with comprehensive status tracking and logging. **Updated**: The new database abstraction layer ensures consistent behavior across SQLite and PostgreSQL implementations, providing seamless scalability from development to production environments. The enhanced architecture supports continuous operation with fault tolerance, making it suitable for enterprise-scale deployment with strict SLAs and high availability requirements.
 
 ## Appendices
 
@@ -611,10 +710,14 @@ The enhanced automated job scheduling system provides comprehensive 24/7 pulse d
   - On email errors, the scheduler attempts retry with exponential backoff, marking jobs as retry_pending until successful delivery or final failure.
 - Version conflict resolution scenario
   - Multiple generations for the same week increment version numbers, preventing data conflicts and enabling historical tracking.
+- **Updated**: Database backend switching scenario
+  - Application seamlessly switches between SQLite and PostgreSQL based on environment configuration without code changes
+  - SQL queries automatically adapt placeholder syntax for different database backends
 
 **Section sources**
 - [schedulerJob.ts:90-97](file://phase-2/src/jobs/schedulerJob.ts#L90-L97)
 - [scheduler.test.ts:69-132](file://phase-2/src/tests/scheduler.test.ts#L69-L132)
+- [dbAdapter.ts:28-52](file://phase-2/src/db/dbAdapter.ts#L28-L52)
 
 ### Enhanced Monitoring and Logging
 - Comprehensive logging
@@ -624,11 +727,16 @@ The enhanced automated job scheduling system provides comprehensive 24/7 pulse d
   - weekly_pulses stores generated content with versioning for inspection
   - API endpoints expose listing and retrieval of pulses with version information
   - Health checks and monitoring endpoints for system status
+- **Updated**: Database monitoring
+  - DbAdapter logs database connection status and query performance metrics
+  - PostgreSQL connection pool monitoring for production deployments
+  - SQLite performance monitoring for development environments
 
 **Section sources**
 - [logger.ts:1-21](file://phase-2/src/core/logger.ts#L1-L21)
 - [index.ts:73-88](file://phase-2/src/db/index.ts#L73-L88)
-- [pulseService.ts:243-264](file://phase-2/src/services/pulseService.ts#L243-L264)
+- [pulseService.ts:243-270](file://phase-2/src/services/pulseService.ts#L243-L270)
+- [dbAdapter.ts:13-22](file://phase-2/src/db/dbAdapter.ts#L13-L22)
 
 ### Enhanced Error Handling and Retry Mechanisms
 - Advanced retry strategies
@@ -642,10 +750,15 @@ The enhanced automated job scheduling system provides comprehensive 24/7 pulse d
 - Enhanced idempotency
   - The scheduler inserts a new job row per tick; ensure deduplication by week_start and preference to prevent duplicate sends
   - Versioning in weekly_pulses prevents data conflicts during concurrent operations
+- **Updated**: Database error handling
+  - DbAdapter provides consistent error handling across SQLite and PostgreSQL backends
+  - Automatic SQL placeholder conversion prevents database-specific syntax errors
+  - Transaction rollback ensures data consistency in case of failures
 
 **Section sources**
 - [schedulerJob.ts:36-40](file://phase-2/src/jobs/schedulerJob.ts#L36-L40)
 - [index.ts:73-82](file://phase-2/src/db/index.ts#L73-L82)
+- [dbAdapter.ts:102-124](file://phase-2/src/db/dbAdapter.ts#L102-L124)
 
 ### Enhanced Job Status Tracking and Historical Reporting
 - Comprehensive status tracking
@@ -656,7 +769,12 @@ The enhanced automated job scheduling system provides comprehensive 24/7 pulse d
   - weekly_pulses: list recent pulses with version information and retrieve individual entries
   - scheduled_jobs: filter by status and time for operational dashboards with retry analytics
   - Enhanced querying capabilities for performance monitoring and capacity planning
+- **Updated**: Database consistency guarantees
+  - DbAdapter ensures ACID compliance across both SQLite and PostgreSQL implementations
+  - Transaction support maintains data integrity during complex operations
+  - Automatic connection management prevents resource leaks
 
 **Section sources**
-- [index.ts:73-88](file://phase-2/src/db/index.ts#L73-L88)
-- [pulseService.ts:243-264](file://phase-2/src/services/pulseService.ts#L243-L264)
+- [index.ts:73-125](file://phase-2/src/db/index.ts#L73-L125)
+- [pulseService.ts:243-270](file://phase-2/src/services/pulseService.ts#L243-L270)
+- [dbAdapter.ts:102-124](file://phase-2/src/db/dbAdapter.ts#L102-L124)
