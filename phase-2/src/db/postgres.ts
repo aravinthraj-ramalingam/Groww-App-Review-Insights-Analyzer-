@@ -96,6 +96,13 @@ export async function initPostgresSchema(): Promise<void> {
       )
     `);
 
+    // Fix sequence if needed (in case of manual data insertion)
+    await client.query(`
+      SELECT setval('weekly_pulses_id_seq', COALESCE((SELECT MAX(id) FROM weekly_pulses), 0) + 1, false)
+    `).catch(() => {
+      // Ignore error if sequence doesn't exist yet
+    });
+
     // User preferences table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_preferences (
