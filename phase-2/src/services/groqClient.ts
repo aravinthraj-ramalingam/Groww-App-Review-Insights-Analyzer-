@@ -22,15 +22,26 @@ function extractJson(raw: string): string {
   // Strip markdown code fences: ```json ... ``` or ``` ... ```
   const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) {
-    return fenceMatch[1].trim();
+    cleaned = fenceMatch[1].trim();
+  } else {
+    // Find the first { and the matching last }
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    }
   }
-
-  // Find the first { and the matching last }
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return cleaned.slice(firstBrace, lastBrace + 1);
-  }
+  
+  // Fix unescaped newlines inside JSON strings (common LLM issue)
+  // Replace actual newlines inside string values with escaped \n
+  cleaned = cleaned.replace(/:\s*"([^"]*)"/g, (match, content) => {
+    // Escape unescaped newlines and carriage returns within the string content
+    const escaped = content
+      .replace(/\\/g, '\\\\')  // Escape backslashes first
+      .replace(/\n/g, '\\n')   // Escape newlines
+      .replace(/\r/g, '\\r');  // Escape carriage returns
+    return ': "' + escaped + '"';
+  });
 
   return cleaned.trim();
 }
