@@ -27,14 +27,22 @@ const app = express();
 // Configure CORS for production
 const allowedOrigins = [
   'https://groww-app-review-insights-analyzer.vercel.app',
-  'https://groww-app-review-insights-analyzer-m4q6espcq.vercel.app'
+  'https://groww-app-review-insights-analyzer-m4q6espcq.vercel.app',
+  'https://groww-app-review-insights-analyzer-git-main-aravinthraj-ramalingams-projects.vercel.app'
 ];
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 };
 app.use(cors(corsOptions));
@@ -78,9 +86,9 @@ app.get('/api/reviews/stats', (_req: Request, res: Response) => {
         lastPulseDate: lastPulse?.week_start || null
       }
     });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error getting stats', err);
-    res.status(500).json({ ok: false, error: 'Failed to get stats' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to get stats' });
   }
 });
 
