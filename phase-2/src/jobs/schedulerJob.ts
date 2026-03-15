@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { dbAdapter } from '../db/dbAdapter';
 import { logInfo, logError } from '../core/logger';
 import { generatePulse } from '../services/pulseService';
 import { sendPulseEmail } from '../services/emailService';
@@ -17,26 +17,27 @@ function lastFullWeekStart(fromUtcIso = new Date().toISOString()): string {
   return monday.toISOString().slice(0, 10);
 }
 
-function scheduleJobRow(prefId: number, weekStart: string, scheduledAt: string): number {
-  const info = db
-    .prepare(
-      `INSERT INTO scheduled_jobs (user_preference_id, week_start, scheduled_at_utc, status)
-       VALUES (?, ?, ?, 'pending')`
-    )
-    .run(prefId, weekStart, scheduledAt);
-  return Number(info.lastInsertRowid);
+async function scheduleJobRow(prefId: number, weekStart: string, scheduledAt: string): Promise<number> {
+  const result = await dbAdapter.run(
+    `INSERT INTO scheduled_jobs (user_preference_id, week_start, scheduled_at_utc, status)
+     VALUES (?, ?, ?, 'pending')`,
+    [prefId, weekStart, scheduledAt]
+  );
+  return result.lastID!;
 }
 
-function markJobSent(jobId: number): void {
-  db.prepare(
-    `UPDATE scheduled_jobs SET status = 'sent', sent_at_utc = ? WHERE id = ?`
-  ).run(new Date().toISOString(), jobId);
+async function markJobSent(jobId: number): Promise<void> {
+  await dbAdapter.run(
+    `UPDATE scheduled_jobs SET status = 'sent', sent_at_utc = ? WHERE id = ?`,
+    [new Date().toISOString(), jobId]
+  );
 }
 
-function markJobFailed(jobId: number, error: string): void {
-  db.prepare(
-    `UPDATE scheduled_jobs SET status = 'failed', last_error = ? WHERE id = ?`
-  ).run(error, jobId);
+async function markJobFailed(jobId: number, error: string): Promise<void> {
+  await dbAdapter.run(
+    `UPDATE scheduled_jobs SET status = 'failed', last_error = ? WHERE id = ?`,
+    [error, jobId]
+  );
 }
 
 /**
@@ -53,7 +54,7 @@ export async function runSchedulerOnce(
   nowUtcIso = new Date().toISOString(),
   emailSender: EmailSender = sendPulseEmail
 ): Promise<{ processed: number; failed: number }> {
-  const duePrefs = listDuePrefs(nowUtcIso);
+  const duePrefs = await listDuePrefs(nowUtcIso);
   logInfo('Scheduler tick', { duePrefs: duePrefs.length, nowUtcIso });
 
   let processed = 0;
@@ -61,7 +62,7 @@ export async function runSchedulerOnce(
 
   for (const pref of duePrefs) {
     const weekStart = lastFullWeekStart(nowUtcIso);
-    const jobId = scheduleJobRow(pref.id, weekStart, nowUtcIso);
+    const jobId = await scheduleJobRow(pref.id, weekStart, nowUtcIso);
 
     try {
       logInfo('Processing scheduled job', { jobId, prefId: pref.id, weekStart });
@@ -69,12 +70,12 @@ export async function runSchedulerOnce(
       const pulse = await generatePulse(weekStart);
       await emailSender(pref.email, pulse);
 
-      markJobSent(jobId);
+      await markJobSent(jobId);
       processed++;
       logInfo('Scheduled pulse sent', { jobId, email: pref.email, weekStart });
     } catch (err: any) {
       const errMsg = err?.message ?? String(err);
-      markJobFailed(jobId, errMsg);
+      await markJobFailed(jobId, errMsg);
       failed++;
       logError('Scheduled pulse failed', { jobId, error: errMsg });
     }

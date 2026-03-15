@@ -170,7 +170,7 @@ app.post('/api/themes/generate', async (req: Request, res: Response) => {
   try {
     const weeksBack = typeof req.body?.weeksBack === 'number' ? req.body.weeksBack : 12;
     const limit = typeof req.body?.limit === 'number' ? req.body.limit : 800;
-    const reviews = listRecentReviews(weeksBack, limit);
+    const reviews = await listRecentReviews(weeksBack, limit);
     logInfo('Generating themes', { weeksBack, limit, reviewCount: reviews.length });
 
     const themes = await generateThemesFromReviews(reviews);
