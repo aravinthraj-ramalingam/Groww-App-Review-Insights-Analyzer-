@@ -174,22 +174,22 @@ app.post('/api/themes/generate', async (req: Request, res: Response) => {
     logInfo('Generating themes', { weeksBack, limit, reviewCount: reviews.length });
 
     const themes = await generateThemesFromReviews(reviews);
-    const ids = upsertThemes(themes);
+    const ids = await upsertThemes(themes);
     res.json({ ok: true, themes: themes.map((t, i) => ({ id: ids[i], ...t })) });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error generating themes', err);
-    res.status(500).json({ ok: false, error: 'Failed to generate themes' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to generate themes' });
   }
 });
 
 /** GET /api/themes — list the latest themes */
-app.get('/api/themes', (_req: Request, res: Response) => {
+app.get('/api/themes', async (_req: Request, res: Response) => {
   try {
-    const themes = listLatestThemes(5);
+    const themes = await listLatestThemes(5);
     res.json({ ok: true, themes });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error listing themes', err);
-    res.status(500).json({ ok: false, error: 'Failed to list themes' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to list themes' });
   }
 });
 
@@ -230,33 +230,33 @@ app.post('/api/pulses/generate', async (req: Request, res: Response) => {
 });
 
 /** GET /api/pulses — list recent pulses */
-app.get('/api/pulses', (_req: Request, res: Response) => {
+app.get('/api/pulses', async (_req: Request, res: Response) => {
   try {
-    const pulses = listPulses(20);
+    const pulses = await listPulses(20);
     res.json({ ok: true, pulses });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error listing pulses', err);
-    res.status(500).json({ ok: false, error: 'Failed to list pulses' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to list pulses' });
   }
 });
 
 /** GET /api/pulses/:id — get a single pulse */
-app.get('/api/pulses/:id', (req: Request, res: Response) => {
+app.get('/api/pulses/:id', async (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
       res.status(400).json({ ok: false, error: 'Invalid pulse id' });
       return;
     }
-    const pulse = getPulse(id);
+    const pulse = await getPulse(id);
     if (!pulse) {
       res.status(404).json({ ok: false, error: 'Pulse not found' });
       return;
     }
     res.json({ ok: true, pulse });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error getting pulse', err);
-    res.status(500).json({ ok: false, error: 'Failed to get pulse' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to get pulse' });
   }
 });
 
@@ -268,7 +268,7 @@ app.post('/api/pulses/:id/send-email', async (req: Request, res: Response) => {
       res.status(400).json({ ok: false, error: 'Invalid pulse id' });
       return;
     }
-    const pulse = getPulse(id);
+    const pulse = await getPulse(id);
     if (!pulse) {
       res.status(404).json({ ok: false, error: 'Pulse not found' });
       return;
@@ -277,7 +277,7 @@ app.post('/api/pulses/:id/send-email', async (req: Request, res: Response) => {
     // Use explicit `to` from body, fall back to active user preference email
     let to: string = req.body?.to;
     if (!to) {
-      const prefs = getUserPrefs();
+      const prefs = await getUserPrefs();
       if (!prefs) {
         res.status(400).json({ ok: false, error: 'No recipient: provide `to` or save user preferences first' });
         return;
@@ -301,7 +301,7 @@ app.post('/api/pulses/:id/send-email', async (req: Request, res: Response) => {
  * POST /api/user-preferences
  * Body: { email, timezone, preferred_day_of_week, preferred_time }
  */
-app.post('/api/user-preferences', (req: Request, res: Response) => {
+app.post('/api/user-preferences', async (req: Request, res: Response) => {
   try {
     const { email, timezone, preferred_day_of_week, preferred_time } = req.body ?? {};
 
@@ -322,7 +322,7 @@ app.post('/api/user-preferences', (req: Request, res: Response) => {
       return;
     }
 
-    const saved = upsertUserPrefs({ email, timezone, preferred_day_of_week, preferred_time });
+    const saved = await upsertUserPrefs({ email, timezone, preferred_day_of_week, preferred_time });
 
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     res.json({
@@ -330,24 +330,24 @@ app.post('/api/user-preferences', (req: Request, res: Response) => {
       preferences: saved,
       confirmation: `You will receive your weekly pulse every ${dayNames[preferred_day_of_week]} at ${preferred_time} (${timezone}) to ${email}.`
     });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error saving user preferences', err);
-    res.status(500).json({ ok: false, error: 'Failed to save preferences' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to save preferences' });
   }
 });
 
 /** GET /api/user-preferences — get current active preferences */
-app.get('/api/user-preferences', (_req: Request, res: Response) => {
+app.get('/api/user-preferences', async (_req: Request, res: Response) => {
   try {
-    const prefs = getUserPrefs();
+    const prefs = await getUserPrefs();
     if (!prefs) {
       res.status(404).json({ ok: false, error: 'No preferences configured yet' });
       return;
     }
     res.json({ ok: true, preferences: prefs });
-  } catch (err) {
+  } catch (err: any) {
     logError('Error getting user preferences', err);
-    res.status(500).json({ ok: false, error: 'Failed to get preferences' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to get preferences' });
   }
 });
 

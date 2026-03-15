@@ -1,4 +1,4 @@
-import { db } from '../db';
+import { dbAdapter } from '../db/dbAdapter';
 
 export interface UserPrefsInput {
   email: string;
@@ -18,41 +18,41 @@ export interface UserPrefsRow extends UserPrefsInput {
  * Create or update user preferences.
  * Only one active row is maintained; existing active rows are deactivated first.
  */
-export function upsertUserPrefs(prefs: UserPrefsInput): UserPrefsRow {
+export async function upsertUserPrefs(prefs: UserPrefsInput): Promise<UserPrefsRow> {
   const now = new Date().toISOString();
 
   // Deactivate all existing active rows
-  db.prepare(`UPDATE user_preferences SET active = 0, updated_at = ? WHERE active = 1`).run(now);
+  await dbAdapter.run(`UPDATE user_preferences SET active = 0, updated_at = ? WHERE active = 1`, [now]);
 
   // Insert new active row
-  const insert = db.prepare(`
-    INSERT INTO user_preferences (email, timezone, preferred_day_of_week, preferred_time, created_at, updated_at, active)
-    VALUES (?, ?, ?, ?, ?, ?, 1)
-  `);
-
-  const info = insert.run(
-    prefs.email,
-    prefs.timezone,
-    prefs.preferred_day_of_week,
-    prefs.preferred_time,
-    now,
-    now
+  const result = await dbAdapter.run(
+    `INSERT INTO user_preferences (email, timezone, preferred_day_of_week, preferred_time, created_at, updated_at, active)
+     VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    [
+      prefs.email,
+      prefs.timezone,
+      prefs.preferred_day_of_week,
+      prefs.preferred_time,
+      now,
+      now
+    ]
   );
 
-  return getUserPrefsById(Number(info.lastInsertRowid))!;
+  return (await getUserPrefsById(result.lastID!))!;
 }
 
-export function getUserPrefsById(id: number): UserPrefsRow | null {
-  return (db.prepare(`SELECT * FROM user_preferences WHERE id = ?`).get(id) as UserPrefsRow) ?? null;
+export async function getUserPrefsById(id: number): Promise<UserPrefsRow | null> {
+  const row = await dbAdapter.queryOne(`SELECT * FROM user_preferences WHERE id = ?`, [id]);
+  return row as UserPrefsRow ?? null;
 }
 
 /** Returns the single active user preference row, or null if none configured. */
-export function getUserPrefs(): UserPrefsRow | null {
-  return (
-    (db
-      .prepare(`SELECT * FROM user_preferences WHERE active = 1 ORDER BY updated_at DESC LIMIT 1`)
-      .get() as UserPrefsRow) ?? null
+export async function getUserPrefs(): Promise<UserPrefsRow | null> {
+  const row = await dbAdapter.queryOne(
+    `SELECT * FROM user_preferences WHERE active = 1 ORDER BY updated_at DESC LIMIT 1`,
+    []
   );
+  return row as UserPrefsRow ?? null;
 }
 
 /**
@@ -80,12 +80,11 @@ export function nextSendUtc(prefs: UserPrefsRow, fromUtcIso = new Date().toISOSt
  * Return user prefs rows that are due to receive a pulse at or before the given UTC time.
  * Checks the latest scheduled_job per user_preference.
  */
-export function listDuePrefs(nowUtcIso = new Date().toISOString()): UserPrefsRow[] {
+export async function listDuePrefs(nowUtcIso = new Date().toISOString()): Promise<UserPrefsRow[]> {
   // A preference is "due" if it has no sent scheduled_job for the current ISO week,
   // and nextSendUtc(prefs) <= nowUtcIso
-  const rows = db
-    .prepare(`SELECT * FROM user_preferences WHERE active = 1`)
-    .all() as UserPrefsRow[];
+  const result = await dbAdapter.query(`SELECT * FROM user_preferences WHERE active = 1`, []);
+  const rows = result.rows as UserPrefsRow[];
 
   return rows.filter((p) => {
     const next = nextSendUtc(p, nowUtcIso);

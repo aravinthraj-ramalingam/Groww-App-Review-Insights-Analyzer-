@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { db } from '../db';
+import { dbAdapter } from '../db/dbAdapter';
 import { groqJson } from './groqClient';
 import { listReviewsForWeek } from './reviewsRepo';
 import { listLatestThemes } from './themeService';
@@ -56,36 +56,35 @@ function countWords(text: string): number {
 /**
  * Aggregate per-theme stats for a given week from the review_themes join.
  */
-function getWeekThemeStats(weekStart: string): ThemeSummary[] {
-  const rows = db
-    .prepare(
-      `SELECT t.id AS theme_id, t.name, t.description,
-              COUNT(rt.review_id) AS review_count,
-              ROUND(AVG(r.rating), 2) AS avg_rating
-       FROM themes t
-       JOIN review_themes rt ON rt.theme_id = t.id
-       JOIN reviews r ON r.id = rt.review_id
-       WHERE r.week_start = ?
-       GROUP BY t.id
-       ORDER BY review_count DESC`
-    )
-    .all(weekStart) as ThemeSummary[];
-  return rows;
+async function getWeekThemeStats(weekStart: string): Promise<ThemeSummary[]> {
+  const result = await dbAdapter.query(
+    `SELECT t.id AS theme_id, t.name, t.description,
+            COUNT(rt.review_id) AS review_count,
+            ROUND(AVG(r.rating), 2) AS avg_rating
+     FROM themes t
+     JOIN review_themes rt ON rt.theme_id = t.id
+     JOIN reviews r ON r.id = rt.review_id
+     WHERE r.week_start = ?
+     GROUP BY t.id
+     ORDER BY review_count DESC`,
+    [weekStart]
+  );
+  return result.rows as ThemeSummary[];
 }
 
 /**
  * Pick up to 3 short, PII-free quotes per theme for the top themes.
  */
-function pickQuotes(topThemeIds: number[], reviews: ReviewRow[]): Quote[] {
+async function pickQuotes(topThemeIds: number[], reviews: ReviewRow[]): Promise<Quote[]> {
   const quotes: Quote[] = [];
   const usedTexts = new Set<string>();
 
   for (const themeId of topThemeIds) {
-    const themeReviewIds = (
-      db
-        .prepare(`SELECT review_id FROM review_themes WHERE theme_id = ?`)
-        .all(themeId) as { review_id: string }[]
-    ).map((r) => r.review_id);
+    const result = await dbAdapter.query(
+      `SELECT review_id FROM review_themes WHERE theme_id = ?`,
+      [themeId]
+    );
+    const themeReviewIds = (result.rows as { review_id: string }[]).map((r) => r.review_id);
 
     const candidates = reviews
       .filter((r) => themeReviewIds.includes(r.id))
@@ -177,12 +176,12 @@ async function generateWeeklyNote(
  * Generate (or regenerate) the weekly pulse for the given week_start (YYYY-MM-DD).
  */
 export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
-  const themes = listLatestThemes(5);
+  const themes = await listLatestThemes(5);
   if (themes.length === 0) {
     throw new Error('No themes found. Run POST /api/themes/generate first.');
   }
 
-  const reviews = listReviewsForWeek(weekStart);
+  const reviews = await listReviewsForWeek(weekStart);
   if (reviews.length === 0) {
     throw new Error(`No reviews found for week ${weekStart}. Ensure theme assignment has run.`);
   }
@@ -194,7 +193,7 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
   const weekEnd = weDate.toISOString().slice(0, 10);
 
   // Aggregate stats + pick top 3 themes
-  const themeStats = getWeekThemeStats(weekStart);
+  const themeStats = await getWeekThemeStats(weekStart);
   const topThemes = themeStats.slice(0, 3);
 
   // If no theme assignments yet, fall back to global themes with 0 counts
@@ -215,38 +214,38 @@ export async function generatePulse(weekStart: string): Promise<WeeklyPulse> {
         }));
 
   const topThemeIds = effectiveTopThemes.map((t) => t.theme_id);
-  const quotes = pickQuotes(topThemeIds, reviews);
+  const quotes = await pickQuotes(topThemeIds, reviews);
   const actionIdeas = await generateActionIdeas(effectiveTopThemes, quotes);
   const noteBody = await generateWeeklyNote(weekStart, effectiveTopThemes, quotes, actionIdeas);
 
   // Determine version (increment if week already exists)
-  const existing = db
-    .prepare(`SELECT MAX(version) as v FROM weekly_pulses WHERE week_start = ?`)
-    .get(weekStart) as { v: number | null };
+  const existing = await dbAdapter.queryOne(
+    `SELECT MAX(version) as v FROM weekly_pulses WHERE week_start = ?`,
+    [weekStart]
+  ) as { v: number | null } | null;
   const version = (existing?.v ?? 0) + 1;
 
   const now = new Date().toISOString();
-  const insert = db.prepare(`
-    INSERT INTO weekly_pulses (week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const info = insert.run(
-    weekStart,
-    weekEnd,
-    JSON.stringify(effectiveTopThemes),
-    JSON.stringify(quotes),
-    JSON.stringify(actionIdeas),
-    noteBody,
-    now,
-    version
+  const result = await dbAdapter.run(
+    `INSERT INTO weekly_pulses (week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      weekStart,
+      weekEnd,
+      JSON.stringify(effectiveTopThemes),
+      JSON.stringify(quotes),
+      JSON.stringify(actionIdeas),
+      noteBody,
+      now,
+      version
+    ]
   );
 
-  return getPulse(Number(info.lastInsertRowid))!;
+  return (await getPulse(result.lastID!))!;
 }
 
-export function getPulse(id: number): WeeklyPulse | null {
-  const row = db.prepare(`SELECT * FROM weekly_pulses WHERE id = ?`).get(id) as any;
+export async function getPulse(id: number): Promise<WeeklyPulse | null> {
+  const row = await dbAdapter.queryOne(`SELECT * FROM weekly_pulses WHERE id = ?`, [id]);
   if (!row) return null;
   return {
     ...row,
@@ -256,11 +255,12 @@ export function getPulse(id: number): WeeklyPulse | null {
   };
 }
 
-export function listPulses(limit = 10): WeeklyPulse[] {
-  const rows = db
-    .prepare(`SELECT * FROM weekly_pulses ORDER BY created_at DESC LIMIT ?`)
-    .all(limit) as any[];
-  return rows.map((row) => ({
+export async function listPulses(limit = 10): Promise<WeeklyPulse[]> {
+  const result = await dbAdapter.query(
+    `SELECT * FROM weekly_pulses ORDER BY created_at DESC LIMIT ?`,
+    [limit]
+  );
+  return result.rows.map((row: any) => ({
     ...row,
     top_themes: JSON.parse(row.top_themes),
     user_quotes: JSON.parse(row.user_quotes),

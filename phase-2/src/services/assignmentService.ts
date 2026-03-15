@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { db } from '../db';
+import { dbAdapter } from '../db/dbAdapter';
 import { groqJson } from './groqClient';
 import { ReviewRow } from '../domain/review';
 import { listLatestThemes } from './themeService';
@@ -74,29 +74,25 @@ export async function assignReviewsToThemes(
  * Persist assignments to the review_themes table (bulk upsert).
  * Looks up theme_id from the theme name; "Other" assignments are skipped.
  */
-export function persistAssignments(
+export async function persistAssignments(
   assignments: Assignment[],
   themes: { id: number; name: string }[]
-): number {
+): Promise<number> {
   const themeMap = new Map(themes.map((t) => [t.name, t.id]));
 
-  const stmt = db.prepare(`
-    INSERT INTO review_themes (review_id, theme_id, confidence)
-    VALUES (?, ?, ?)
-    ON CONFLICT(review_id, theme_id) DO UPDATE SET confidence = excluded.confidence;
-  `);
-
   let count = 0;
-  const tx = db.transaction(() => {
-    for (const a of assignments) {
-      const themeId = themeMap.get(a.theme_name);
-      if (!themeId) continue; // skip "Other" or unknown
-      stmt.run(a.review_id, themeId, a.confidence ?? null);
-      count++;
-    }
-  });
+  for (const a of assignments) {
+    const themeId = themeMap.get(a.theme_name);
+    if (!themeId) continue; // skip "Other" or unknown
+    await dbAdapter.run(
+      `INSERT INTO review_themes (review_id, theme_id, confidence)
+       VALUES (?, ?, ?)
+       ON CONFLICT(review_id, theme_id) DO UPDATE SET confidence = excluded.confidence`,
+      [a.review_id, themeId, a.confidence ?? null]
+    );
+    count++;
+  }
 
-  tx();
   return count;
 }
 
@@ -106,11 +102,11 @@ export function persistAssignments(
 export async function assignWeekReviews(
   weekStart: string
 ): Promise<{ assigned: number; skipped: number; themes: number }> {
-  const reviews = listReviewsForWeek(weekStart);
-  const themes = listLatestThemes(5);
+  const reviews = await listReviewsForWeek(weekStart);
+  const themes = await listLatestThemes(5);
 
   const assignments = await assignReviewsToThemes(reviews, themes);
-  const assigned = persistAssignments(assignments, themes);
+  const assigned = await persistAssignments(assignments, themes);
   const skipped = assignments.length - assigned;
 
   return { assigned, skipped, themes: themes.length };
