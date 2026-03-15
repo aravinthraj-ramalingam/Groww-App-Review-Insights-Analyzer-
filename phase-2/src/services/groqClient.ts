@@ -9,22 +9,26 @@ export const groq =
 /**
  * Extract JSON object from a string that may be wrapped in markdown code fences
  * or have extra text before/after the JSON.
+ * Also removes control characters that break JSON parsing.
  */
 function extractJson(raw: string): string {
+  // Remove control characters (except common whitespace: \n, \r, \t)
+  let cleaned = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  
   // Strip markdown code fences: ```json ... ``` or ``` ... ```
-  const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) {
     return fenceMatch[1].trim();
   }
 
   // Find the first { and the matching last }
-  const firstBrace = raw.indexOf('{');
-  const lastBrace = raw.lastIndexOf('}');
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return raw.slice(firstBrace, lastBrace + 1);
+    return cleaned.slice(firstBrace, lastBrace + 1);
   }
 
-  return raw.trim();
+  return cleaned.trim();
 }
 
 export async function groqJson<T>(params: {
