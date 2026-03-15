@@ -59,6 +59,20 @@ function Dashboard() {
     }
   }
 
+  const handleAssignThemes = async () => {
+    setActionLoading('assign')
+    try {
+      const weekStart = getCurrentWeekStart()
+      await themesApi.assign(weekStart)
+      setMessage({ type: 'success', text: 'Themes assigned to reviews successfully!' })
+      loadDashboardData()
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Failed to assign themes' })
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleGeneratePulse = async () => {
     setActionLoading('pulse')
     try {
@@ -145,6 +159,13 @@ function Dashboard() {
             disabled={actionLoading === 'themes'}
           >
             {actionLoading === 'themes' ? 'Generating...' : '🏷️ Generate Themes'}
+          </button>
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleAssignThemes}
+            disabled={actionLoading === 'assign'}
+          >
+            {actionLoading === 'assign' ? 'Assigning...' : '🔗 Assign Themes'}
           </button>
           <button 
             className="btn btn-primary" 
