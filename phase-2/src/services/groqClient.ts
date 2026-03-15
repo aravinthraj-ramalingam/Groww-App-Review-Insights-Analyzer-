@@ -12,8 +12,12 @@ export const groq =
  * Also removes control characters that break JSON parsing.
  */
 function extractJson(raw: string): string {
-  // Remove control characters (except common whitespace: \n, \r, \t)
-  let cleaned = raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  // Remove ALL control characters and non-printable characters
+  // Keep only printable ASCII (32-126) and common whitespace (\n=10, \r=13, \t=9)
+  let cleaned = raw
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // Control chars
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // Zero-width spaces
+    .replace(/\uFFFD/g, ''); // Replacement character
   
   // Strip markdown code fences: ```json ... ``` or ``` ... ```
   const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -57,7 +61,15 @@ export async function groqJson<T>(params: {
       const content = completion.choices?.[0]?.message?.content ?? '';
       const jsonText = extractJson(content);
 
-      return JSON.parse(jsonText) as T;
+      // Debug: log first 200 chars if parse fails
+      try {
+        return JSON.parse(jsonText) as T;
+      } catch (parseErr: any) {
+        console.error(`[DEBUG] JSON parse error at position: ${parseErr.message}`);
+        console.error(`[DEBUG] Content preview (first 300 chars): ${jsonText.slice(0, 300)}`);
+        console.error(`[DEBUG] Raw content preview (first 300 chars): ${content.slice(0, 300)}`);
+        throw parseErr;
+      }
     } catch (err: any) {
       lastError = err;
       console.warn(`[Retry ${attempt}/${MAX_RETRIES}] Groq JSON parse or API error: ${err.message}`);
