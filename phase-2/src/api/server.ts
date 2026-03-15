@@ -111,7 +111,7 @@ app.get('/api/reviews/stats', async (_req: Request, res: Response) => {
 });
 
 /** GET /api/reviews — list reviews with optional filters */
-app.get('/api/reviews', (req: Request, res: Response) => {
+app.get('/api/reviews', async (req: Request, res: Response) => {
   try {
     const { week_start, minRating, maxRating } = req.query;
     
@@ -119,25 +119,31 @@ app.get('/api/reviews', (req: Request, res: Response) => {
     const params: any[] = [];
     
     if (week_start) {
-      query += ' AND week_start = ?';
+      query += ' AND week_start = $' + (params.length + 1);
       params.push(week_start);
     }
     if (minRating) {
-      query += ' AND rating >= ?';
+      query += ' AND rating >= $' + (params.length + 1);
       params.push(parseInt(minRating as string));
     }
     if (maxRating) {
-      query += ' AND rating <= ?';
+      query += ' AND rating <= $' + (params.length + 1);
       params.push(parseInt(maxRating as string));
     }
     
     query += ' ORDER BY created_at DESC LIMIT 500';
     
-    const reviews = db.prepare(query).all(...params);
-    res.json({ ok: true, reviews });
-  } catch (err) {
+    if (isPostgres()) {
+      const pool = getPool();
+      const result = await pool.query(query, params);
+      res.json({ ok: true, reviews: result.rows });
+    } else {
+      const reviews = db.prepare(query).all(...params);
+      res.json({ ok: true, reviews });
+    }
+  } catch (err: any) {
     logError('Error listing reviews', err);
-    res.status(500).json({ ok: false, error: 'Failed to list reviews' });
+    res.status(500).json({ ok: false, error: err.message || 'Failed to list reviews' });
   }
 });
 

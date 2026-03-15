@@ -5,6 +5,7 @@
 - [server.ts](file://phase-2/src/api/server.ts)
 - [env.ts](file://phase-2/src/config/env.ts)
 - [db/index.ts](file://phase-2/src/db/index.ts)
+- [db/postgres.ts](file://phase-2/src/db/postgres.ts)
 - [themeService.ts](file://phase-2/src/services/themeService.ts)
 - [assignmentService.ts](file://phase-2/src/services/assignmentService.ts)
 - [pulseService.ts](file://phase-2/src/services/pulseService.ts)
@@ -22,12 +23,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive REST API endpoints documentation for `/api/reviews/stats`, `/api/reviews`, `/api/reviews/scrape`, `/api/reviews/week/:weekStart`, `/api/themes`, `/api/pulses`, and `/api/user-preferences`
-- Enhanced server with CORS configuration for production environments
-- Improved error handling across all endpoints with consistent response patterns
-- Added dashboard statistics endpoint for system monitoring
-- Updated endpoint paths to reflect actual implementation (`/api/user-preferences` instead of `/api/preferences`)
-- Enhanced CORS configuration with environment-specific origins
+- Enhanced statistics endpoint (/api/reviews/stats) with dual database backend support (PostgreSQL and SQLite)
+- Added PostgreSQL connection pooling with runtime database selection logic
+- Updated database initialization to support environment-based backend switching
+- Added comprehensive error handling for both database backends
+- Enhanced server with conditional database logic for production deployments
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -48,14 +48,14 @@ This document provides comprehensive API documentation for Phase 2 endpoints foc
 - Pulse generation: weekly insights creation, theme assignment, and content aggregation
 - User preference management: scheduling configuration, delivery preferences, and subscription management
 - Email service endpoints: testing SMTP configuration and delivery verification
-- Dashboard statistics: system monitoring and analytics
+- Dashboard statistics: system monitoring and analytics with dual database backend support
 
 It also documents request/response schemas, authentication requirements, parameter validation rules, error handling patterns, and includes concrete examples of complex workflows such as theme-to-pulse assignment, automated scheduling, and preference-based filtering. Security, API versioning, rate limiting, and production deployment considerations are addressed.
 
 ## Project Structure
-The Phase 2 backend is organized around a small Express server, a SQLite database, and modular services:
+The Phase 2 backend is organized around a small Express server, dual database support (PostgreSQL and SQLite), and modular services:
 - API routes: centralized in the server file with comprehensive endpoint coverage
-- Configuration: environment variables for database, ports, and external services
+- Configuration: environment variables for database selection, ports, and external services
 - Domain models: review schema
 - Services:
   - Theme service: LLM-driven theme generation and storage
@@ -65,14 +65,16 @@ The Phase 2 backend is organized around a small Express server, a SQLite databas
   - User preferences: CRUD and scheduling helpers
   - Reviews repository: data access for review operations
   - Scheduler job: periodic automation
-- Database initialization and schema
+- Database initialization and schema management with runtime backend selection
 
 ```mermaid
 graph TB
 Client["Client"]
 API["Express Server<br/>routes in server.ts"]
 Config["Config<br/>env.ts"]
-DB["SQLite DB<br/>db/index.ts"]
+DB["Dual Database<br/>db/index.ts"]
+Postgres["PostgreSQL Pool<br/>db/postgres.ts"]
+SQLite["SQLite DB<br/>db/index.ts"]
 ThemeSvc["Theme Service<br/>themeService.ts"]
 AssignSvc["Assignment Service<br/>assignmentService.ts"]
 PulseSvc["Pulse Service<br/>pulseService.ts"]
@@ -100,12 +102,15 @@ Scheduler --> EmailSvc
 ThemeSvc --> Groq
 AssignSvc --> Groq
 PulseSvc --> Groq
+DB --> Postgres
+DB --> SQLite
 ```
 
 **Diagram sources**
-- [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
+- [server.ts:1-400](file://phase-2/src/api/server.ts#L1-L400)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [db/index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [db/postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
@@ -116,13 +121,13 @@ PulseSvc --> Groq
 - [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
 
 **Section sources**
-- [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
+- [server.ts:1-400](file://phase-2/src/api/server.ts#L1-L400)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [db/index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [db/index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 
 ## Core Components
 - Dashboard & Statistics
-  - System stats: GET /api/reviews/stats
+  - System stats: GET /api/reviews/stats (with dual database backend support)
 - Review Management
   - List reviews: GET /api/reviews
   - Scrape reviews: POST /api/reviews/scrape
@@ -145,76 +150,52 @@ PulseSvc --> Groq
   - Scheduler: runs periodically to generate and deliver pulses based on preferences
 
 **Section sources**
-- [server.ts:39-331](file://phase-2/src/api/server.ts#L39-L331)
+- [server.ts:57-111](file://phase-2/src/api/server.ts#L57-L111)
 
 ## Architecture Overview
-The API exposes endpoints that orchestrate data ingestion, LLM-powered analytics, and email delivery. The database stores themes, assignments, weekly pulses, user preferences, and scheduled jobs. The scheduler automates pulse generation and delivery.
+The API exposes endpoints that orchestrate data ingestion, LLM-powered analytics, and email delivery. The database layer now supports dual backend configuration with runtime selection based on environment variables. The PostgreSQL backend uses connection pooling for production deployments, while SQLite serves local development needs.
 
 ```mermaid
 sequenceDiagram
 participant C as "Client"
 participant S as "Server Routes<br/>server.ts"
-participant T as "Theme Service<br/>themeService.ts"
-participant A as "Assignment Service<br/>assignmentService.ts"
-participant P as "Pulse Service<br/>pulseService.ts"
-participant E as "Email Service<br/>emailService.ts"
-participant R as "Reviews Repository<br/>reviewsRepo.ts"
-participant DB as "DB<br/>db/index.ts"
+participant DB as "Database Layer<br/>db/index.ts"
+participant PG as "PostgreSQL Pool<br/>db/postgres.ts"
+participant SQ as "SQLite DB<br/>db/index.ts"
 C->>S : GET /api/reviews/stats
-S->>DB : Query statistics
-DB-->>S : Stats data
+S->>DB : Check isPostgres()
+DB-->>S : Boolean (backend type)
+alt PostgreSQL backend
+S->>PG : getPool()
+PG-->>S : Connection Pool
+S->>PG : Execute queries with pool
+PG-->>S : Query results
+else SQLite backend
+S->>SQ : Execute queries directly
+SQ-->>S : Query results
+end
 S-->>C : { ok, stats }
-C->>S : GET /api/reviews
-S->>R : listRecentReviews()
-R->>DB : Query reviews
-DB-->>R : Review data
-R-->>S : Reviews
-S-->>C : { ok, reviews }
-C->>S : POST /api/themes/generate
-S->>R : listRecentReviews()
-R->>DB : Query recent reviews
-DB-->>R : Review data
-R-->>S : Reviews
-S->>T : generateThemesFromReviews(reviews)
-T->>DB : upsertThemes(themes)
-T-->>S : ids
-S-->>C : { ok, themes }
-C->>S : POST /api/pulses/ : id/send-email
-S->>DB : getPulse(id)
-DB-->>S : WeeklyPulse or null
-alt Pulse not found
-S-->>C : 404 { error }
-else Found
-alt to provided
-S->>E : sendPulseEmail(to, pulse)
-else to missing
-S->>DB : getUserPrefs()
-DB-->>S : UserPrefsRow or null
-alt No prefs
-S-->>C : 400 { error }
-else Prefs exist
-S->>E : sendPulseEmail(prefs.email, pulse)
-end
-end
-E-->>S : success
-S-->>C : { ok, message }
 ```
 
 **Diagram sources**
-- [server.ts:39-331](file://phase-2/src/api/server.ts#L39-L331)
-- [themeService.ts:17-66](file://phase-2/src/services/themeService.ts#L17-L66)
-- [assignmentService.ts:27-113](file://phase-2/src/services/assignmentService.ts#L27-L113)
-- [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
-- [emailService.ts:114-141](file://phase-2/src/services/emailService.ts#L114-L141)
-- [userPrefsRepo.ts:21-56](file://phase-2/src/services/userPrefsRepo.ts#L21-L56)
-- [reviewsRepo.ts:4-24](file://phase-2/src/services/reviewsRepo.ts#L4-L24)
-- [db/index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [server.ts:57-111](file://phase-2/src/api/server.ts#L57-L111)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 
 ## Detailed Component Analysis
 
 ### Dashboard & Statistics Endpoints
 - GET /api/reviews/stats
   - Purpose: Retrieve system statistics including total reviews, themes, weeks covered, and last pulse date.
+  - Backend Selection: Automatically selects between PostgreSQL and SQLite based on DATABASE_URL environment variable.
+  - PostgreSQL Path:
+    - Uses connection pooling for efficient database operations
+    - Executes optimized queries for counts and last pulse date
+    - Handles PostgreSQL-specific data types and timestamp formats
+  - SQLite Path:
+    - Direct database queries for local development
+    - Handles SQLite-specific data types and date formats
+    - Graceful fallback when tables don't exist
   - Response:
     - ok: boolean
     - stats: {
@@ -224,24 +205,39 @@ S-->>C : { ok, message }
         lastPulseDate: string|null
       }
   - Error handling:
-    - 500 on database query failure with generic error message.
+    - 500 on database query failure with generic error message
+    - Proper error logging for both backend types
 
 ```mermaid
 flowchart TD
-Start(["GET /api/reviews/stats"]) --> QueryReviews["Query total reviews count"]
-QueryReviews --> QueryThemes["Query total themes count"]
-QueryThemes --> QueryWeeks["Query weeks covered"]
-QueryWeeks --> QueryLastPulse["Query last pulse date"]
+Start(["GET /api/reviews/stats"]) --> CheckBackend["Check DATABASE_URL env var"]
+CheckBackend --> IsPostgres{"isPostgres()? "}
+IsPostgres --> |true| UsePostgres["PostgreSQL Path"]
+IsPostgres --> |false| UseSQLite["SQLite Path"]
+UsePostgres --> PoolQuery["Get connection pool"]
+PoolQuery --> QueryReviews["Execute COUNT reviews"]
+QueryReviews --> QueryThemes["Execute COUNT themes"]
+QueryThemes --> QueryWeeks["Execute COUNT DISTINCT weeks"]
+QueryWeeks --> QueryLastPulse["Execute last pulse query"]
 QueryLastPulse --> BuildResponse["Build stats object"]
 BuildResponse --> ReturnOK["Return { ok, stats }"]
+UseSQLite --> TableCheck["Check if reviews table exists"]
+TableCheck --> Exists{"Table exists?"}
+Exists --> |No| ReturnEmpty["Return empty stats"]
+Exists --> |Yes| QueryDirect["Execute direct queries"]
+QueryDirect --> BuildResponse
+ReturnEmpty --> ReturnOK
 ReturnOK --> End(["Done"])
 ```
 
 **Diagram sources**
-- [server.ts:39-60](file://phase-2/src/api/server.ts#L39-L60)
+- [server.ts:57-111](file://phase-2/src/api/server.ts#L57-L111)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
 
 **Section sources**
-- [server.ts:39-60](file://phase-2/src/api/server.ts#L39-L60)
+- [server.ts:57-111](file://phase-2/src/api/server.ts#L57-L111)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 
 ### Review Management Endpoints
 - GET /api/reviews
@@ -282,11 +278,11 @@ ReturnReviews --> End(["Done"])
 ```
 
 **Diagram sources**
-- [server.ts:62-91](file://phase-2/src/api/server.ts#L62-L91)
+- [server.ts:113-142](file://phase-2/src/api/server.ts#L113-L142)
 - [reviewsRepo.ts:4-24](file://phase-2/src/services/reviewsRepo.ts#L4-L24)
 
 **Section sources**
-- [server.ts:62-105](file://phase-2/src/api/server.ts#L62-L105)
+- [server.ts:113-142](file://phase-2/src/api/server.ts#L113-L142)
 - [reviewsRepo.ts:4-24](file://phase-2/src/services/reviewsRepo.ts#L4-L24)
 
 ### Theme Management Endpoints
@@ -338,12 +334,12 @@ ReturnOK --> End(["Done"])
 ```
 
 **Diagram sources**
-- [server.ts:111-126](file://phase-2/src/api/server.ts#L111-L126)
+- [server.ts:162-177](file://phase-2/src/api/server.ts#L162-L177)
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
 
 **Section sources**
-- [server.ts:111-153](file://phase-2/src/api/server.ts#L111-L153)
+- [server.ts:162-177](file://phase-2/src/api/server.ts#L162-L177)
 - [themeService.ts:6-13](file://phase-2/src/services/themeService.ts#L6-L13)
 - [themeService.ts:17-66](file://phase-2/src/services/themeService.ts#L17-L66)
 - [groqClient.ts:30-65](file://phase-2/src/services/groqClient.ts#L30-L65)
@@ -421,13 +417,13 @@ end
 ```
 
 **Diagram sources**
-- [server.ts:206-237](file://phase-2/src/api/server.ts#L206-L237)
+- [server.ts:257-288](file://phase-2/src/api/server.ts#L257-L288)
 - [pulseService.ts:243-252](file://phase-2/src/services/pulseService.ts#L243-L252)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
 - [userPrefsRepo.ts:50-56](file://phase-2/src/services/userPrefsRepo.ts#L50-L56)
 
 **Section sources**
-- [server.ts:159-237](file://phase-2/src/api/server.ts#L159-L237)
+- [server.ts:210-288](file://phase-2/src/api/server.ts#L210-L288)
 - [pulseService.ts:28-38](file://phase-2/src/services/pulseService.ts#L28-L38)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [pulseService.ts:243-264](file://phase-2/src/services/pulseService.ts#L243-L264)
@@ -465,11 +461,11 @@ Insert --> Return["Return { ok, preferences, confirmation }"]
 ```
 
 **Diagram sources**
-- [server.ts:243-295](file://phase-2/src/api/server.ts#L243-L295)
+- [server.ts:294-331](file://phase-2/src/api/server.ts#L294-L331)
 - [userPrefsRepo.ts:21-43](file://phase-2/src/services/userPrefsRepo.ts#L21-L43)
 
 **Section sources**
-- [server.ts:243-295](file://phase-2/src/api/server.ts#L243-L295)
+- [server.ts:294-331](file://phase-2/src/api/server.ts#L294-L331)
 - [userPrefsRepo.ts:3-15](file://phase-2/src/services/userPrefsRepo.ts#L3-L15)
 - [userPrefsRepo.ts:21-56](file://phase-2/src/services/userPrefsRepo.ts#L21-L56)
 
@@ -496,11 +492,11 @@ S-->>C : { ok, message }
 ```
 
 **Diagram sources**
-- [server.ts:301-315](file://phase-2/src/api/server.ts#L301-L315)
+- [server.ts:352-366](file://phase-2/src/api/server.ts#L352-L366)
 - [emailService.ts:132-141](file://phase-2/src/services/emailService.ts#L132-L141)
 
 **Section sources**
-- [server.ts:301-315](file://phase-2/src/api/server.ts#L301-L315)
+- [server.ts:352-366](file://phase-2/src/api/server.ts#L352-L366)
 - [emailService.ts:99-141](file://phase-2/src/services/emailService.ts#L99-L141)
 
 ### Automation and Scheduling
@@ -542,14 +538,15 @@ end
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
 
 **Section sources**
-- [server.ts:334-346](file://phase-2/src/api/server.ts#L334-L346)
+- [server.ts:388-397](file://phase-2/src/api/server.ts#L388-L397)
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [userPrefsRepo.ts:62-94](file://phase-2/src/services/userPrefsRepo.ts#L62-L94)
 
 ## Dependency Analysis
 - External dependencies:
   - Express for routing
-  - better-sqlite3 for database
+  - better-sqlite3 for SQLite database
+  - pg for PostgreSQL connection pooling
   - groq-sdk for LLM
   - nodemailer for email
   - zod for schema validation
@@ -567,6 +564,7 @@ Zod["zod"] --> ThemeSvc["themeService.ts"]
 Zod --> AssignmentSvc["assignmentService.ts"]
 Zod --> PulseSvc["pulseService.ts"]
 Better["better-sqlite3"] --> DB["db/index.ts"]
+PG["pg"] --> Postgres["db/postgres.ts"]
 GroqSDK["groq-sdk"] --> Groq["groqClient.ts"]
 Nodemailer["nodemailer"] --> Email["emailService.ts"]
 Server --> ThemeSvc
@@ -583,12 +581,16 @@ Pref --> DB
 ReviewsRepo --> DB
 Scheduler --> PulseSvc
 Scheduler --> Email
+DB --> Postgres
+DB --> Better
+Postgres --> PG
 ```
 
 **Diagram sources**
 - [package.json:13-22](file://phase-2/package.json#L13-L22)
 - [server.ts:1-15](file://phase-2/src/api/server.ts#L1-L15)
 - [db/index.ts:1-5](file://phase-2/src/db/index.ts#L1-L5)
+- [db/postgres.ts:1-2](file://phase-2/src/db/postgres.ts#L1-L2)
 - [groqClient.ts:1-7](file://phase-2/src/services/groqClient.ts#L1-L7)
 - [emailService.ts:1-6](file://phase-2/src/services/emailService.ts#L1-L6)
 
@@ -597,6 +599,10 @@ Scheduler --> Email
 - [server.ts:1-15](file://phase-2/src/api/server.ts#L1-L15)
 
 ## Performance Considerations
+- Dual database backend support:
+  - PostgreSQL connection pooling for production scalability
+  - SQLite for lightweight local development
+  - Runtime backend selection based on environment variables
 - Batch processing:
   - Assignment service processes reviews in batches to control token usage and throughput.
 - Database indexing:
@@ -609,11 +615,13 @@ Scheduler --> Email
   - Environment-specific CORS configuration reduces unnecessary preflight requests in production.
 
 **Section sources**
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 - [assignmentService.ts:21-67](file://phase-2/src/services/assignmentService.ts#L21-L67)
 - [db/index.ts:19-88](file://phase-2/src/db/index.ts#L19-L88)
 - [groqClient.ts:39-65](file://phase-2/src/services/groqClient.ts#L39-L65)
 - [pulseService.ts:134-172](file://phase-2/src/services/pulseService.ts#L134-L172)
-- [server.ts:22-29](file://phase-2/src/api/server.ts#L22-L29)
+- [server.ts:26-47](file://phase-2/src/api/server.ts#L26-L47)
 
 ## Troubleshooting Guide
 - Authentication and Authorization
@@ -622,23 +630,30 @@ Scheduler --> Email
   - Server includes CORS middleware with environment-specific origins. In production, configure FRONTEND_URL environment variable.
 - Environment configuration
   - Missing SMTP credentials cause email errors; missing GROQ API key prevents scheduler from starting.
+  - DATABASE_URL environment variable determines backend selection (PostgreSQL if set, SQLite if not).
 - Parameter validation
   - Date formats, numeric ranges, and email patterns are validated in routes; invalid inputs return 400.
 - Error handling
   - Routes wrap handlers in try/catch and log errors; responses include ok:false and error messages.
+- Database backend selection
+  - PostgreSQL: Requires DATABASE_URL environment variable and connection pool initialization
+  - SQLite: Uses local database file specified in config
+  - Automatic fallback ensures graceful degradation
 - PII scrubbing
   - All user-facing text is scrubbed before storage or delivery.
 
 **Section sources**
-- [server.ts:22-29](file://phase-2/src/api/server.ts#L22-L29)
-- [server.ts:39-331](file://phase-2/src/api/server.ts#L39-L331)
+- [server.ts:26-47](file://phase-2/src/api/server.ts#L26-L47)
+- [server.ts:57-111](file://phase-2/src/api/server.ts#L57-L111)
 - [emailService.ts:99-102](file://phase-2/src/services/emailService.ts#L99-L102)
 - [env.ts:16-21](file://phase-2/src/config/env.ts#L16-L21)
 - [groqClient.ts:35-37](file://phase-2/src/services/groqClient.ts#L35-L37)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:8-11](file://phase-2/src/db/postgres.ts#L8-L11)
 - [piiScrubber.ts:22-28](file://phase-2/src/services/piiScrubber.ts#L22-L28)
 
 ## Conclusion
-Phase 2 introduces robust APIs for theme generation, review assignment, weekly pulse creation, user preference management, and automated email delivery. The system leverages LLMs for intelligent content analysis while maintaining strong validation, PII scrubbing, and operational safeguards. The enhanced CORS configuration and comprehensive endpoint coverage make it suitable for production deployment. Production deployments should enforce authentication, configure rate limiting, and monitor LLM usage and email deliverability.
+Phase 2 introduces robust APIs for theme generation, review assignment, weekly pulse creation, user preference management, and automated email delivery. The system now supports dual database backend configurations with PostgreSQL connection pooling for production deployments and SQLite for development. The enhanced statistics endpoint demonstrates the flexibility of the runtime database selection logic, while maintaining strong validation, PII scrubbing, and operational safeguards. Production deployments should enforce authentication, configure rate limiting, monitor LLM usage and email deliverability, and properly set up database environment variables for optimal performance.
 
 ## Appendices
 
@@ -647,6 +662,7 @@ Phase 2 introduces robust APIs for theme generation, review assignment, weekly p
 - Dashboard & Statistics
   - GET /api/reviews/stats
     - Response: { ok: boolean; stats: { totalReviews: number; totalThemes: number; weeksCovered: number; lastPulseDate: string|null } }
+    - Backend: Automatically selects PostgreSQL (connection pool) or SQLite based on DATABASE_URL environment variable
 - Review Management
   - GET /api/reviews
     - Query: { week_start?: string; minRating?: number; maxRating?: number }
@@ -689,7 +705,24 @@ Phase 2 introduces robust APIs for theme generation, review assignment, weekly p
     - Response: { ok: boolean; message: string }
 
 **Section sources**
-- [server.ts:39-331](file://phase-2/src/api/server.ts#L39-L331)
+- [server.ts:57-366](file://phase-2/src/api/server.ts#L57-L366)
+
+### Database Configuration
+
+- Environment Variables
+  - DATABASE_URL: PostgreSQL connection string (enables PostgreSQL backend)
+  - DATABASE_FILE: SQLite database file path (default: 'phase1.db')
+  - GROQ_API_KEY: LLM API key for scheduler functionality
+  - SMTP_*: Email service configuration variables
+- Backend Selection Logic
+  - PostgreSQL: Used when DATABASE_URL is present
+  - SQLite: Used as fallback for local development
+  - Automatic runtime switching based on environment detection
+
+**Section sources**
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:8-11](file://phase-2/src/db/postgres.ts#L8-L11)
+- [env.ts:16-21](file://phase-2/src/config/env.ts#L16-L21)
 
 ### Data Models
 
@@ -744,7 +777,7 @@ USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
 ```
 
 **Diagram sources**
-- [db/index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [db/index.ts:24-125](file://phase-2/src/db/index.ts#L24-L125)
 
 ### Request/Response Schemas
 
@@ -810,11 +843,17 @@ USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
   - Steps:
     1. GET /api/user-preferences to retrieve active preferences
     2. Use preferences to compute next send time and filter due recipients
+- Database Backend Switching
+  - Steps:
+    1. Set DATABASE_URL environment variable for PostgreSQL deployment
+    2. Access /api/reviews/stats to automatically use PostgreSQL connection pool
+    3. Remove DATABASE_URL for local development to use SQLite
 
 **Section sources**
-- [server.ts:39-331](file://phase-2/src/api/server.ts#L39-L331)
+- [server.ts:57-366](file://phase-2/src/api/server.ts#L57-L366)
 - [userPrefsRepo.ts:50-94](file://phase-2/src/services/userPrefsRepo.ts#L50-L94)
 - [schedulerJob.ts:52-84](file://phase-2/src/jobs/schedulerJob.ts#L52-L84)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
 
 ### Security, Versioning, and Rate Limiting
 
@@ -822,15 +861,21 @@ USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
   - No built-in authentication; deploy behind an API gateway or reverse proxy with authentication and TLS termination.
   - Validate and sanitize all inputs; PII scrubbing is applied before storage and delivery.
   - CORS configuration supports environment-specific origins for production deployments.
+  - Database backend selection is transparent and secure based on environment variables.
 - API Versioning
   - No versioned route paths are used; consider adding a version prefix (e.g., /v1) in future iterations.
 - Rate Limiting
   - Not implemented; consider adding middleware to throttle requests per IP or user.
+- Database Security
+  - PostgreSQL connection pooling with SSL configuration for Render compatibility
+  - SQLite file-based storage for local development
+  - Environment-based backend selection prevents accidental production misconfiguration
 
 **Section sources**
-- [server.ts:1-349](file://phase-2/src/api/server.ts#L1-L349)
+- [server.ts:1-400](file://phase-2/src/api/server.ts#L1-L400)
 - [env.ts:16-21](file://phase-2/src/config/env.ts#L16-L21)
-- [server.ts:22-29](file://phase-2/src/api/server.ts#L22-L29)
+- [server.ts:26-47](file://phase-2/src/api/server.ts#L26-L47)
+- [db/postgres.ts:13-18](file://phase-2/src/db/postgres.ts#L13-L18)
 
 ### Tests and Validation References
 - Pulse generation shape and word count enforcement
@@ -838,9 +883,13 @@ USER_PREFERENCES ||--o{ SCHEDULED_JOBS : "generates"
 - User preferences CRUD and active-row semantics
 - Assignment persistence and schema allowances
 - Review listing with filtering capabilities
+- Database backend switching and connection pooling
+- Statistics endpoint dual backend support
 
 **Section sources**
 - [pulse.test.ts:17-96](file://phase-2/src/tests/pulse.test.ts#L17-L96)
 - [userPrefs.test.ts:50-98](file://phase-2/src/tests/userPrefs.test.ts#L50-L98)
 - [assignment.test.ts:57-109](file://phase-2/src/tests/assignment.test.ts#L57-L109)
 - [reviewsRepo.ts:4-24](file://phase-2/src/services/reviewsRepo.ts#L4-L24)
+- [db/index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [db/postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)

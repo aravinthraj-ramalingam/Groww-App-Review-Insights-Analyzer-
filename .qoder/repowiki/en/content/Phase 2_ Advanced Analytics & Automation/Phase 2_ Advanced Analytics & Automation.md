@@ -26,9 +26,10 @@
 ## Update Summary
 **Changes Made**
 - Enhanced LLM Integration with Groq now includes improved JSON parsing with state machine algorithm for better reliability
-- Added PostgreSQL migration capabilities with dedicated migration script and PostgreSQL connection management
+- Added comprehensive PostgreSQL migration system with dedicated migration script and enhanced database abstraction layer
+- Implemented runtime database backend detection capabilities for seamless development and production switching
 - Enhanced API configuration for production deployment with improved CORS handling and health checks
-- Added production-ready deployment configuration for Render platform
+- Added production-ready deployment configuration for Render platform with PostgreSQL support
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -45,7 +46,7 @@
 ## Introduction
 Phase 2 introduces advanced AI-driven analytics powered by Groq, enabling theme generation from recent reviews, review-to-theme assignment with confidence scores, and automated weekly pulse creation. It integrates robust prompt engineering, strict JSON schema validation, and PII scrubbing to ensure safe, reliable outputs. The system includes a production-ready email service with SMTP configuration and template management, plus a scheduler that automatically generates and delivers weekly pulses to user preferences. APIs expose endpoints for theme management, pulse generation, and user preferences, while database schema extensions support persistent storage of themes, assignments, weekly pulses, user preferences, and scheduled jobs.
 
-**Updated** Enhanced with PostgreSQL migration capabilities and improved JSON parsing reliability for production deployments.
+**Updated** Enhanced with comprehensive PostgreSQL migration capabilities, runtime database backend detection, and production-ready deployment configuration for seamless development and production environments.
 
 ## Project Structure
 Phase 2 builds upon Phase 1's SQLite database and adds a modular backend with:
@@ -54,7 +55,7 @@ Phase 2 builds upon Phase 1's SQLite database and adds a modular backend with:
 - Scheduler for automated weekly pulse generation and delivery
 - Scripts for end-to-end pipeline runs, email testing, and PostgreSQL migration
 - Strong typing via Zod schemas and domain models
-- Dual database support (SQLite for development, PostgreSQL for production)
+- Dual database support (SQLite for development, PostgreSQL for production) with automatic backend detection
 
 ```mermaid
 graph TB
@@ -73,15 +74,18 @@ end
 subgraph "Jobs"
 SJ["schedulerJob.ts"]
 end
-subgraph "Persistence"
+subgraph "Database Abstraction"
 DB["db/index.ts"]
 PG["db/postgres.ts"]
+DA["Database Abstraction"]
+end
+subgraph "Domain Models"
 DM["domain/review.ts"]
 end
-subgraph "Config"
+subgraph "Configuration"
 CFG["config/env.ts"]
 end
-subgraph "Scripts"
+subgraph "Migration & Scripts"
 PIPE["scripts/runPulsePipeline.ts"]
 TEST["scripts/testEmail.ts"]
 MIG["scripts/migrateToPostgres.ts"]
@@ -107,16 +111,18 @@ DB --> PS
 DB --> UR
 DB --> SJ
 PG --> DB
+DA --> DB
+DA --> PG
+MIG --> PG
 PIPE --> TS
 PIPE --> AS
 PIPE --> PS
 PIPE --> ES
 TEST --> ES
-MIG --> PG
 ```
 
 **Diagram sources**
-- [server.ts:1-382](file://phase-2/src/api/server.ts#L1-L382)
+- [server.ts:1-400](file://phase-2/src/api/server.ts#L1-L400)
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
@@ -134,7 +140,7 @@ MIG --> PG
 - [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 **Section sources**
-- [server.ts:1-382](file://phase-2/src/api/server.ts#L1-L382)
+- [server.ts:1-400](file://phase-2/src/api/server.ts#L1-L400)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
@@ -147,13 +153,13 @@ MIG --> PG
 - Weekly pulse generation with action ideas and note composition
 - Email service with HTML/text templates and SMTP transport
 - Automated scheduler for weekly pulse delivery based on user preferences
-- Database schema extensions for themes, assignments, pulses, preferences, and scheduled jobs
-- Dual database support (SQLite for development, PostgreSQL for production)
-- PostgreSQL migration capabilities with data preservation
+- Database abstraction layer with runtime backend detection (SQLite vs PostgreSQL)
+- PostgreSQL migration system with data preservation and conflict resolution
+- Dual database support with automatic schema initialization
 - API endpoints for theme management, pulse generation, and user preferences
 - Production-ready deployment configuration with health checks and CORS
 
-**Updated** Enhanced with improved JSON parsing reliability, PostgreSQL migration capabilities, and production-ready deployment configuration.
+**Updated** Enhanced with comprehensive PostgreSQL migration capabilities, runtime database backend detection, and production-ready deployment configuration.
 
 **Section sources**
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
@@ -165,17 +171,17 @@ MIG --> PG
 - [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
 - [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
-- [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
+- [server.ts:27-52](file://phase-2/src/api/server.ts#L27-L52)
 
 ## Architecture Overview
-The system orchestrates a data flow from stored reviews to AI-generated insights and automated delivery:
+The system orchestrates a data flow from stored reviews to AI-generated insights and automated delivery with intelligent database backend selection:
 - API routes trigger theme generation, assignment, and pulse creation with production-ready CORS
 - Groq is used for structured outputs with schema hints and retries using enhanced JSON parsing
 - Zod validates AI outputs against strict schemas
-- Dual database support (SQLite for development, PostgreSQL for production) with automatic selection
+- Runtime database backend detection automatically selects SQLite for development or PostgreSQL for production
 - Nodemailer sends HTML/text emails with PII scrubbing
 - Scheduler periodically checks due preferences and dispatches pulses
-- PostgreSQL migration script preserves data during transition from SQLite
+- PostgreSQL migration script preserves data during transition from SQLite with conflict resolution
 
 ```mermaid
 sequenceDiagram
@@ -202,7 +208,7 @@ Pulse->>DB : insert weekly_pulses
 Client->>API : POST /api/pulses/ : id/send-email
 API->>Email : sendPulseEmail(to, pulse)
 Email-->>Client : {ok}
-Note over DB,PG : Automatic database selection<br/>SQLite for development<br/>PostgreSQL for production
+Note over DB,PG : Runtime database detection<br/>Automatic backend selection<br/>SQLite for development<br/>PostgreSQL for production
 ```
 
 **Diagram sources**
@@ -234,8 +240,7 @@ RetryLoop --> CallLLM["Call chat.completions.create(model, messages)"]
 CallLLM --> Extract["Extract JSON from response"]
 Extract --> Clean["Remove control characters<br/>and zero-width spaces"]
 Clean --> Fence{"Markdown code fences?"}
-Fence --> |Yes| StripFence["Strip
-```json ... ``` or ``` ... ```"]
+Fence --> |Yes| StripFence["Strip JSON code fences"]
 Fence --> |No| FindBraces["Find first { and matching }"]
 StripFence --> StateMachine["State machine JSON parsing<br/>handles nested quotes & escapes"]
 FindBraces --> StateMachine
@@ -253,26 +258,27 @@ RetryLoop --> |Fail after 3| FinalErr["Log final error and throw"]
 **Section sources**
 - [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 
-### PostgreSQL Migration System
+### Comprehensive PostgreSQL Migration System
 - Dedicated migration script (`migrateToPostgres.ts`) for seamless transition from SQLite to PostgreSQL
 - Preserves all data integrity with conflict resolution using `ON CONFLICT (id) DO NOTHING`
 - Supports migration from Phase 1 SQLite database to PostgreSQL schema
 - Maintains referential integrity across all tables during migration
+- Handles different data types and constraints between SQLite and PostgreSQL
 
-**New** Added comprehensive PostgreSQL migration capabilities for production deployments.
+**New** Added comprehensive PostgreSQL migration capabilities for production deployments with automatic schema conversion and data preservation.
 
 ```mermaid
 flowchart TD
 Start(["Run migrateToPostgres.ts"]) --> InitPG["Initialize PostgreSQL schema"]
 InitPG --> ConnectSQLite["Connect to Phase 1 SQLite DB"]
-ConnectSQLite --> MigrateReviews["Migrate reviews table"]
-MigrateReviews --> MigrateThemes["Migrate themes table"]
-MigrateThemes --> MigrateReviewThemes["Migrate review_themes table"]
-MigrateReviewThemes --> MigratePulses["Migrate weekly_pulses table"]
-MigratePulses --> MigratePrefs["Migrate user_preferences table"]
-MigratePrefs --> MigrateJobs["Migrate scheduled_jobs table"]
+ConnectSQLite --> MigrateReviews["Migrate reviews table<br/>with conflict resolution"]
+MigrateReviews --> MigrateThemes["Migrate themes table<br/>with conflict resolution"]
+MigrateThemes --> MigrateReviewThemes["Migrate review_themes table<br/>with conflict resolution"]
+MigrateReviewThemes --> MigratePulses["Migrate weekly_pulses table<br/>with conflict resolution"]
+MigratePulses --> MigratePrefs["Migrate user_preferences table<br/>with conflict resolution"]
+MigratePrefs --> MigrateJobs["Migrate scheduled_jobs table<br/>with conflict resolution"]
 MigrateJobs --> CloseDBs["Close connections"]
-CloseDBs --> Success["Migration completed successfully"]
+CloseDBs --> Success["Migration completed successfully<br/>Data preserved with conflicts ignored"]
 ```
 
 **Diagram sources**
@@ -281,6 +287,37 @@ CloseDBs --> Success["Migration completed successfully"]
 **Section sources**
 - [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 - [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
+
+### Database Abstraction Layer with Runtime Detection
+- Automatic backend detection based on `DATABASE_URL` environment variable
+- Unified interface for SQLite and PostgreSQL operations
+- Conditional schema initialization for development vs production
+- Connection pooling for PostgreSQL with SSL configuration
+- Type-safe database operations with consistent API
+
+**New** Enhanced with runtime database backend detection and unified abstraction layer for seamless development and production switching.
+
+```mermaid
+flowchart TD
+Start(["Application Startup"]) --> DetectDB{"DATABASE_URL env var?"}
+DetectDB --> |Present| UsePG["Use PostgreSQL Backend"]
+DetectDB --> |Missing| UseSQLite["Use SQLite Backend"]
+UsePG --> InitPG["initPostgresSchema()"]
+UseSQLite --> InitSQLite["initSQLiteSchema()"]
+InitPG --> Pool["Initialize PostgreSQL Pool<br/>with SSL configuration"]
+InitSQLite --> DB["Initialize SQLite Database"]
+Pool --> Ready["Ready for Operations"]
+DB --> Ready
+Ready --> Operations["Execute Database Operations<br/>through unified interface"]
+```
+
+**Diagram sources**
+- [index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
+
+**Section sources**
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 
 ### Theme Generation Workflow
 - Loads recent reviews and samples a subset
@@ -450,8 +487,9 @@ Next --> ForEach
 - Health check endpoint for container monitoring
 - Automatic database selection (SQLite vs PostgreSQL) based on environment
 - Environment-specific configuration management
+- Dashboard statistics with backend-aware queries
 
-**Updated** Enhanced with production-ready CORS configuration and health checks for containerized deployments.
+**Updated** Enhanced with production-ready CORS configuration, health checks, and backend-aware dashboard statistics.
 
 ```mermaid
 flowchart TD
@@ -469,7 +507,7 @@ HealthCheck --> StartServer["Start Express server"]
 
 **Diagram sources**
 - [server.ts:18-23](file://phase-2/src/api/server.ts#L18-L23)
-- [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
+- [server.ts:27-52](file://phase-2/src/api/server.ts#L27-L52)
 - [server.ts:51-52](file://phase-2/src/api/server.ts#L51-L52)
 - [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
 - [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
@@ -511,7 +549,7 @@ Pref-->>API : UserPrefsRow | null
 - user_preferences: stores user email and delivery preferences
 - scheduled_jobs: tracks scheduler execution status and errors
 
-**Updated** Enhanced with dual database support and automatic schema initialization.
+**Updated** Enhanced with dual database support and automatic schema initialization with runtime backend detection.
 
 ```mermaid
 erDiagram
@@ -589,13 +627,14 @@ WEEKLY_PULSES ||--|| SCHEDULED_JOBS : "relates to"
   - POST /api/email/test: send a test email to verify SMTP setup
 - Debug convenience
   - GET /api/reviews/week/:weekStart: list a week's reviews
+  - GET /api/reviews/stats: get dashboard statistics (backend-aware)
 - Production endpoints
   - GET /health: health check endpoint for monitoring
 
-**Updated** Added health check endpoint for production monitoring and enhanced CORS configuration.
+**Updated** Added health check endpoint for production monitoring, backend-aware statistics endpoint, and enhanced CORS configuration.
 
 **Section sources**
-- [server.ts:28-382](file://phase-2/src/api/server.ts#L28-L382)
+- [server.ts:28-400](file://phase-2/src/api/server.ts#L28-L400)
 
 ## Dependency Analysis
 - External libraries
@@ -605,15 +644,15 @@ WEEKLY_PULSES ||--|| SCHEDULED_JOBS : "relates to"
   - nodemailer: SMTP transport
   - zod: schema validation
   - dotenv: environment loading
-  - pg: PostgreSQL driver for production
+  - pg: PostgreSQL driver for production with connection pooling
 - Internal dependencies
   - API depends on services and repositories
-  - Services depend on Groq client, Zod schemas, and database
+  - Services depend on Groq client, Zod schemas, and database abstraction
   - Scheduler depends on pulse and email services and user preferences
   - Scripts orchestrate full pipeline execution and database migration
-  - PostgreSQL module provides production database connectivity
+  - PostgreSQL module provides production database connectivity with SSL configuration
 
-**Updated** Added PostgreSQL driver dependency for production deployments.
+**Updated** Added PostgreSQL driver dependency with connection pooling and SSL configuration for production deployments.
 
 ```mermaid
 graph LR
@@ -661,14 +700,15 @@ MIG["migrateToPostgres.ts"] --> PG
 - Batched Groq calls: assignmentService processes reviews in small batches to manage token usage and cost
 - Schema-first prompts: strict schema hints reduce hallucinations and parsing overhead
 - Enhanced JSON parsing: state machine algorithm improves reliability and reduces parsing failures
-- Dual database support: automatic selection optimizes for development vs production environments
+- Runtime database backend detection: automatic selection optimizes for development vs production environments
 - SQLite indexing: unique indexes on themes and weekly pulses prevent duplicates and speed lookups
+- PostgreSQL connection pooling: efficient resource utilization with SSL configuration in production
 - Retry with jittered temperature: improves resilience without excessive retries
 - PII scrubbing: minimal regex passes ensure safe outputs before persistence or email
 - Scheduler cadence: default 5-minute intervals balance timeliness and resource usage
-- PostgreSQL connection pooling: efficient resource utilization in production
+- Migration performance: batch processing with conflict resolution prevents data loss
 
-**Updated** Enhanced with improved JSON parsing reliability and PostgreSQL connection pooling for production.
+**Updated** Enhanced with PostgreSQL connection pooling, SSL configuration, and migration performance optimizations.
 
 ## Troubleshooting Guide
 - Groq API key missing
@@ -688,19 +728,22 @@ MIG["migrateToPostgres.ts"] --> PG
   - Resolution: set GROQ_API_KEY to enable automatic scheduler start
 - Database connection issues
   - Symptom: PostgreSQL connection errors in production
-  - Resolution: ensure DATABASE_URL environment variable is set correctly
+  - Resolution: ensure DATABASE_URL environment variable is set correctly with SSL configuration
 - JSON parsing failures
   - Symptom: Groq responses not properly parsed
   - Resolution: enhanced state machine algorithm handles malformed JSON more reliably
 - Migration failures
   - Symptom: PostgreSQL migration errors
-  - Resolution: verify Phase 1 SQLite database exists and PostgreSQL connection is available
+  - Resolution: verify Phase 1 SQLite database exists, PostgreSQL connection is available, and migration script has proper permissions
 - Email delivery failures
   - Use the test endpoint to validate SMTP configuration
 - Pipeline script issues
   - Ensure database initialization and recent reviews exist before running the pipeline
+- Backend detection issues
+  - Symptom: unexpected database backend usage
+  - Resolution: verify DATABASE_URL environment variable presence for PostgreSQL detection
 
-**Updated** Added troubleshooting for database connection issues, JSON parsing failures, and migration failures.
+**Updated** Added troubleshooting for database connection issues, JSON parsing failures, migration failures, and backend detection issues.
 
 **Section sources**
 - [groqClient.ts:98-100](file://phase-2/src/services/groqClient.ts#L98-L100)
@@ -713,9 +756,9 @@ MIG["migrateToPostgres.ts"] --> PG
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 
 ## Conclusion
-Phase 2 delivers a production-grade, AI-powered analytics pipeline that transforms app store reviews into actionable insights. By combining structured prompts, schema validation, and robust persistence, it ensures reliable theme generation, accurate assignments, and high-quality weekly pulses. The enhanced JSON parsing with state machine algorithm improves reliability, while dual database support enables seamless development and production deployments. The email service and scheduler automate delivery based on user preferences, while the API exposes clear endpoints for operational control. Extensive logging, error handling, and testing support ongoing maintenance and scaling. PostgreSQL migration capabilities ensure smooth transition to production environments.
+Phase 2 delivers a production-grade, AI-powered analytics pipeline that transforms app store reviews into actionable insights with comprehensive database migration capabilities. By combining structured prompts, schema validation, and robust persistence with intelligent backend detection, it ensures reliable theme generation, accurate assignments, and high-quality weekly pulses. The enhanced JSON parsing with state machine algorithm improves reliability, while the dual database support enables seamless development and production deployments with automatic backend selection. The PostgreSQL migration system provides smooth transition paths with data preservation, and the email service and scheduler automate delivery based on user preferences. The API exposes clear endpoints for operational control with production-ready monitoring and CORS configuration. Extensive logging, error handling, and testing support ongoing maintenance and scaling.
 
-**Updated** Enhanced with improved JSON parsing reliability, PostgreSQL migration capabilities, and production-ready deployment configuration.
+**Updated** Enhanced with comprehensive PostgreSQL migration capabilities, runtime database backend detection, and production-ready deployment configuration.
 
 ## Appendices
 
@@ -748,8 +791,13 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
 - PostgreSQL Migration Example
   - Migrate from SQLite to PostgreSQL
     - Script: scripts/migrateToPostgres.ts
-    - Behavior: initializes PostgreSQL schema, migrates all tables with data preservation
+    - Behavior: initializes PostgreSQL schema, migrates all tables with data preservation and conflict resolution
     - Reference: [migrateToPostgres.ts:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
+
+- Database Backend Detection Example
+  - Runtime backend selection
+    - Behavior: automatic detection based on DATABASE_URL environment variable
+    - Reference: [index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19), [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 
 - Production Deployment Example
   - Health check monitoring
@@ -757,7 +805,7 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
     - Behavior: returns application health status for container monitoring
     - Reference: [server.ts:51-52](file://phase-2/src/api/server.ts#L51-L52)
   - CORS configuration
-    - Behavior: allows multiple frontend origins in production
+    - Behavior: allows multiple frontend origins in production with dynamic origin checking
     - Reference: [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
 
 - End-to-End Pipeline Script
@@ -766,7 +814,7 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
     - Steps: init schema, generate themes, assign themes, generate pulse, send email
     - Reference: [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 
-**Updated** Added PostgreSQL migration and production deployment examples.
+**Updated** Added PostgreSQL migration, database backend detection, and production deployment examples.
 
 **Section sources**
 - [server.ts:144-270](file://phase-2/src/api/server.ts#L144-L270)
@@ -776,3 +824,5 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
 - [emailService.ts:9-129](file://phase-2/src/services/emailService.ts#L9-L129)
 - [migrateToPostgres.ts:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
+- [index.ts:6-19](file://phase-2/src/db/index.ts#L6-L19)
+- [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)

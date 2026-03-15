@@ -22,11 +22,12 @@
 
 ## Update Summary
 **Changes Made**
-- Added PostgreSQL database integration with dual database support (SQLite/PostgreSQL)
-- Enhanced error handling for empty databases with automatic database selection based on environment variables
-- Updated database initialization to support both SQLite and PostgreSQL schemas
-- Added PostgreSQL connection pooling and SSL configuration
-- Updated deployment configurations for both database options
+- Enhanced dual database backend support with comprehensive PostgreSQL implementation
+- Implemented runtime database selection logic based on environment variables
+- Added PostgreSQL connection pooling with SSL configuration for production deployments
+- Updated database initialization to support both SQLite and PostgreSQL schemas with identical structure
+- Enhanced error handling for empty databases with automatic fallback mechanisms
+- Updated deployment configurations for both database options with environment-based routing
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -456,8 +457,6 @@ PulseService --> DB : "queries"
 - **Environment-specific backups**:
   - Automated backup strategies based on database type selection
 
-[No sources needed since this section provides general guidance]
-
 ### CRUD Operations and Examples
 - **Create**
   - Upsert themes: insert multiple themes atomically
@@ -606,8 +605,6 @@ P1_PKG --> DB_DEP
 - **Connection pooling**: PostgreSQL uses connection pooling for optimal resource utilization
 - **Database selection**: Automatic selection based on environment for optimal performance
 - **Memory usage**: SQLite for local development, PostgreSQL for production scalability
-
-[No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
 - **Schema not initialized**:
