@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from '../config/env';
-import { initSchema } from '../db';
+import { initSchema, db, isPostgres, getPool } from '../db';
 import { logError, logInfo } from '../core/logger';
 
 // ── Service imports ──────────────────────────────────────────────────────────
@@ -12,7 +12,6 @@ import { generatePulse, getPulse, listPulses } from '../services/pulseService';
 import { sendPulseEmail, sendTestEmail } from '../services/emailService';
 import { upsertUserPrefs, getUserPrefs } from '../services/userPrefsRepo';
 import { startScheduler } from '../jobs/schedulerJob';
-import { db } from '../db';
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 initSchema().then(() => {
@@ -56,36 +55,55 @@ app.get('/health', (_req: Request, res: Response) => res.json({ ok: true }));
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** GET /api/reviews/stats — get dashboard statistics */
-app.get('/api/reviews/stats', (_req: Request, res: Response) => {
+app.get('/api/reviews/stats', async (_req: Request, res: Response) => {
   try {
-    // Check if reviews table exists and has data
-    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='reviews'").get();
-    if (!tableCheck) {
-      return res.json({
+    if (isPostgres()) {
+      // PostgreSQL path
+      const pool = getPool();
+      const totalReviewsResult = await pool.query('SELECT COUNT(*) as count FROM reviews');
+      const totalThemesResult = await pool.query('SELECT COUNT(*) as count FROM themes');
+      const weeksCoveredResult = await pool.query('SELECT COUNT(DISTINCT week_start) as count FROM reviews');
+      const lastPulseResult = await pool.query('SELECT week_start FROM weekly_pulses ORDER BY created_at DESC LIMIT 1');
+      
+      res.json({
         ok: true,
         stats: {
-          totalReviews: 0,
-          totalThemes: 0,
-          weeksCovered: 0,
-          lastPulseDate: null
+          totalReviews: parseInt(totalReviewsResult.rows[0]?.count || '0'),
+          totalThemes: parseInt(totalThemesResult.rows[0]?.count || '0'),
+          weeksCovered: parseInt(weeksCoveredResult.rows[0]?.count || '0'),
+          lastPulseDate: lastPulseResult.rows[0]?.week_start || null
+        }
+      });
+    } else {
+      // SQLite path
+      const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='reviews'").get();
+      if (!tableCheck) {
+        return res.json({
+          ok: true,
+          stats: {
+            totalReviews: 0,
+            totalThemes: 0,
+            weeksCovered: 0,
+            lastPulseDate: null
+          }
+        });
+      }
+      
+      const totalReviews = (db.prepare('SELECT COUNT(*) as count FROM reviews').get() as any)?.count || 0;
+      const totalThemes = (db.prepare('SELECT COUNT(*) as count FROM themes').get() as any)?.count || 0;
+      const weeksCovered = (db.prepare('SELECT COUNT(DISTINCT week_start) as count FROM reviews').get() as any)?.count || 0;
+      const lastPulse = db.prepare('SELECT week_start FROM weekly_pulses ORDER BY created_at DESC LIMIT 1').get() as any;
+      
+      res.json({
+        ok: true,
+        stats: {
+          totalReviews,
+          totalThemes,
+          weeksCovered,
+          lastPulseDate: lastPulse?.week_start || null
         }
       });
     }
-    
-    const totalReviews = (db.prepare('SELECT COUNT(*) as count FROM reviews').get() as any)?.count || 0;
-    const totalThemes = (db.prepare('SELECT COUNT(*) as count FROM themes').get() as any)?.count || 0;
-    const weeksCovered = (db.prepare('SELECT COUNT(DISTINCT week_start) as count FROM reviews').get() as any)?.count || 0;
-    const lastPulse = db.prepare('SELECT week_start FROM weekly_pulses ORDER BY created_at DESC LIMIT 1').get() as any;
-    
-    res.json({
-      ok: true,
-      stats: {
-        totalReviews,
-        totalThemes,
-        weeksCovered,
-        lastPulseDate: lastPulse?.week_start || null
-      }
-    });
   } catch (err: any) {
     logError('Error getting stats', err);
     res.status(500).json({ ok: false, error: err.message || 'Failed to get stats' });

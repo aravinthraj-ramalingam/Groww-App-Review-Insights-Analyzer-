@@ -13,11 +13,22 @@
 - [reviewsRepo.ts](file://phase-2/src/services/reviewsRepo.ts)
 - [userPrefsRepo.ts](file://phase-2/src/services/userPrefsRepo.ts)
 - [index.ts](file://phase-2/src/db/index.ts)
+- [postgres.ts](file://phase-2/src/db/postgres.ts)
 - [review.ts](file://phase-2/src/domain/review.ts)
 - [runPulsePipeline.ts](file://phase-2/scripts/runPulsePipeline.ts)
 - [testEmail.ts](file://phase-2/scripts/testEmail.ts)
+- [migrateToPostgres.ts](file://phase-2/scripts/migrateToPostgres.ts)
 - [package.json](file://phase-2/package.json)
+- [Dockerfile](file://Dockerfile)
+- [render.yaml](file://phase-2/render.yaml)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced LLM Integration with Groq now includes improved JSON parsing with state machine algorithm for better reliability
+- Added PostgreSQL migration capabilities with dedicated migration script and PostgreSQL connection management
+- Enhanced API configuration for production deployment with improved CORS handling and health checks
+- Added production-ready deployment configuration for Render platform
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -34,13 +45,16 @@
 ## Introduction
 Phase 2 introduces advanced AI-driven analytics powered by Groq, enabling theme generation from recent reviews, review-to-theme assignment with confidence scores, and automated weekly pulse creation. It integrates robust prompt engineering, strict JSON schema validation, and PII scrubbing to ensure safe, reliable outputs. The system includes a production-ready email service with SMTP configuration and template management, plus a scheduler that automatically generates and delivers weekly pulses to user preferences. APIs expose endpoints for theme management, pulse generation, and user preferences, while database schema extensions support persistent storage of themes, assignments, weekly pulses, user preferences, and scheduled jobs.
 
+**Updated** Enhanced with PostgreSQL migration capabilities and improved JSON parsing reliability for production deployments.
+
 ## Project Structure
-Phase 2 builds upon Phase 1’s SQLite database and adds a modular backend with:
-- API layer exposing REST endpoints
+Phase 2 builds upon Phase 1's SQLite database and adds a modular backend with:
+- API layer exposing REST endpoints with production-ready CORS configuration
 - Services for Groq integration, theme management, assignment, pulse generation, email, and user preferences
 - Scheduler for automated weekly pulse generation and delivery
-- Scripts for end-to-end pipeline runs and email testing
+- Scripts for end-to-end pipeline runs, email testing, and PostgreSQL migration
 - Strong typing via Zod schemas and domain models
+- Dual database support (SQLite for development, PostgreSQL for production)
 
 ```mermaid
 graph TB
@@ -61,6 +75,7 @@ SJ["schedulerJob.ts"]
 end
 subgraph "Persistence"
 DB["db/index.ts"]
+PG["db/postgres.ts"]
 DM["domain/review.ts"]
 end
 subgraph "Config"
@@ -69,6 +84,7 @@ end
 subgraph "Scripts"
 PIPE["scripts/runPulsePipeline.ts"]
 TEST["scripts/testEmail.ts"]
+MIG["scripts/migrateToPostgres.ts"]
 end
 S --> TS
 S --> AS
@@ -90,16 +106,18 @@ DB --> AS
 DB --> PS
 DB --> UR
 DB --> SJ
+PG --> DB
 PIPE --> TS
 PIPE --> AS
 PIPE --> PS
 PIPE --> ES
 TEST --> ES
+MIG --> PG
 ```
 
 **Diagram sources**
-- [server.ts:1-266](file://phase-2/src/api/server.ts#L1-L266)
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
+- [server.ts:1-382](file://phase-2/src/api/server.ts#L1-L382)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
@@ -107,46 +125,57 @@ TEST --> ES
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [reviewsRepo.ts:1-26](file://phase-2/src/services/reviewsRepo.ts#L1-L26)
 - [userPrefsRepo.ts:1-95](file://phase-2/src/services/userPrefsRepo.ts#L1-L95)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
 - [review.ts:1-12](file://phase-2/src/domain/review.ts#L1-L12)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
 - [runPulsePipeline.ts:1-52](file://phase-2/scripts/runPulsePipeline.ts#L1-L52)
 - [testEmail.ts:1-16](file://phase-2/scripts/testEmail.ts#L1-L16)
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 
 **Section sources**
-- [server.ts:1-266](file://phase-2/src/api/server.ts#L1-L266)
+- [server.ts:1-382](file://phase-2/src/api/server.ts#L1-L382)
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
-- [package.json:1-30](file://phase-2/package.json#L1-L30)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [package.json:1-34](file://phase-2/package.json#L1-L34)
 
 ## Core Components
-- Groq client with robust JSON extraction and retry logic
+- Groq client with robust JSON extraction using state machine algorithm and retry logic
 - Theme generation using LLM with schema validation
 - Review-to-theme assignment with confidence scoring
 - Weekly pulse generation with action ideas and note composition
 - Email service with HTML/text templates and SMTP transport
 - Automated scheduler for weekly pulse delivery based on user preferences
 - Database schema extensions for themes, assignments, pulses, preferences, and scheduled jobs
+- Dual database support (SQLite for development, PostgreSQL for production)
+- PostgreSQL migration capabilities with data preservation
 - API endpoints for theme management, pulse generation, and user preferences
+- Production-ready deployment configuration with health checks and CORS
+
+**Updated** Enhanced with improved JSON parsing reliability, PostgreSQL migration capabilities, and production-ready deployment configuration.
 
 **Section sources**
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 - [themeService.ts:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [assignmentService.ts:1-114](file://phase-2/src/services/assignmentService.ts#L1-L114)
 - [pulseService.ts:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
 - [emailService.ts:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [schedulerJob.ts:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
-- [index.ts:1-93](file://phase-2/src/db/index.ts#L1-L93)
-- [server.ts:28-248](file://phase-2/src/api/server.ts#L28-L248)
+- [index.ts:1-133](file://phase-2/src/db/index.ts#L1-L133)
+- [postgres.ts:1-143](file://phase-2/src/db/postgres.ts#L1-L143)
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
+- [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
 
 ## Architecture Overview
 The system orchestrates a data flow from stored reviews to AI-generated insights and automated delivery:
-- API routes trigger theme generation, assignment, and pulse creation
-- Groq is used for structured outputs with schema hints and retries
+- API routes trigger theme generation, assignment, and pulse creation with production-ready CORS
+- Groq is used for structured outputs with schema hints and retries using enhanced JSON parsing
 - Zod validates AI outputs against strict schemas
-- SQLite persists themes, assignments, pulses, preferences, and scheduled jobs
+- Dual database support (SQLite for development, PostgreSQL for production) with automatic selection
 - Nodemailer sends HTML/text emails with PII scrubbing
 - Scheduler periodically checks due preferences and dispatches pulses
+- PostgreSQL migration script preserves data during transition from SQLite
 
 ```mermaid
 sequenceDiagram
@@ -157,6 +186,7 @@ participant Assign as "assignmentService.ts"
 participant Pulse as "pulseService.ts"
 participant Email as "emailService.ts"
 participant DB as "db/index.ts"
+participant PG as "db/postgres.ts"
 Client->>API : POST /api/themes/generate
 API->>Theme : generateThemesFromReviews(recent_reviews)
 Theme->>DB : upsertThemes(themes)
@@ -172,6 +202,7 @@ Pulse->>DB : insert weekly_pulses
 Client->>API : POST /api/pulses/ : id/send-email
 API->>Email : sendPulseEmail(to, pulse)
 Email-->>Client : {ok}
+Note over DB,PG : Automatic database selection<br/>SQLite for development<br/>PostgreSQL for production
 ```
 
 **Diagram sources**
@@ -180,15 +211,19 @@ Email-->>Client : {ok}
 - [assignmentService.ts:27-113](file://phase-2/src/services/assignmentService.ts#L27-L113)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [emailService.ts:114-129](file://phase-2/src/services/emailService.ts#L114-L129)
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
+- [postgres.ts:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 
 ## Detailed Component Analysis
 
-### Groq Client and Prompt Engineering
+### Enhanced Groq Client and JSON Parsing
 - Initializes Groq SDK only when API key is present
-- Implements robust JSON extraction from LLM responses, including fenced code blocks
+- Implements robust JSON extraction using state machine algorithm for better reliability
+- Handles markdown code fences, control characters, and malformed JSON gracefully
 - Retries with increasing temperature to improve reliability
 - Enforces strict schema hints and parses responses with Zod
+
+**Updated** Enhanced with state machine algorithm for JSON parsing that properly handles nested quotes, escaped characters, and unescaped newlines within JSON strings.
 
 ```mermaid
 flowchart TD
@@ -197,7 +232,14 @@ CheckKey --> |No| ThrowErr["Throw error: API key missing"]
 CheckKey --> |Yes| RetryLoop["Retry loop (max 3 attempts)"]
 RetryLoop --> CallLLM["Call chat.completions.create(model, messages)"]
 CallLLM --> Extract["Extract JSON from response"]
-Extract --> Parse["JSON.parse(extractJson)"]
+Extract --> Clean["Remove control characters<br/>and zero-width spaces"]
+Clean --> Fence{"Markdown code fences?"}
+Fence --> |Yes| StripFence["Strip
+```json ... ``` or ``` ... ```"]
+Fence --> |No| FindBraces["Find first { and matching }"]
+StripFence --> StateMachine["State machine JSON parsing<br/>handles nested quotes & escapes"]
+FindBraces --> StateMachine
+StateMachine --> Parse["JSON.parse with debug context"]
 Parse --> Validate["Zod parse with schemaHint"]
 Validate --> Done(["Return typed result"])
 Validate --> |Fail| RetryLoop
@@ -205,15 +247,45 @@ RetryLoop --> |Fail after 3| FinalErr["Log final error and throw"]
 ```
 
 **Diagram sources**
-- [groqClient.ts:30-67](file://phase-2/src/services/groqClient.ts#L30-L67)
+- [groqClient.ts:14-91](file://phase-2/src/services/groqClient.ts#L14-L91)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
 
 **Section sources**
-- [groqClient.ts:1-67](file://phase-2/src/services/groqClient.ts#L1-L67)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
+
+### PostgreSQL Migration System
+- Dedicated migration script (`migrateToPostgres.ts`) for seamless transition from SQLite to PostgreSQL
+- Preserves all data integrity with conflict resolution using `ON CONFLICT (id) DO NOTHING`
+- Supports migration from Phase 1 SQLite database to PostgreSQL schema
+- Maintains referential integrity across all tables during migration
+
+**New** Added comprehensive PostgreSQL migration capabilities for production deployments.
+
+```mermaid
+flowchart TD
+Start(["Run migrateToPostgres.ts"]) --> InitPG["Initialize PostgreSQL schema"]
+InitPG --> ConnectSQLite["Connect to Phase 1 SQLite DB"]
+ConnectSQLite --> MigrateReviews["Migrate reviews table"]
+MigrateReviews --> MigrateThemes["Migrate themes table"]
+MigrateThemes --> MigrateReviewThemes["Migrate review_themes table"]
+MigrateReviewThemes --> MigratePulses["Migrate weekly_pulses table"]
+MigratePulses --> MigratePrefs["Migrate user_preferences table"]
+MigratePrefs --> MigrateJobs["Migrate scheduled_jobs table"]
+MigrateJobs --> CloseDBs["Close connections"]
+CloseDBs --> Success["Migration completed successfully"]
+```
+
+**Diagram sources**
+- [migrateToPostgres.ts:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
+
+**Section sources**
+- [migrateToPostgres.ts:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
+- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
 
 ### Theme Generation Workflow
 - Loads recent reviews and samples a subset
 - Prompts Groq to propose 3–5 themes with names and descriptions
-- Validates response using Zod schema
+- Validates response using Zod schema with enhanced JSON parsing
 - Upserts themes into the database with timestamps
 
 ```mermaid
@@ -227,25 +299,25 @@ API->>Repo : listRecentReviews(weeksBack, limit)
 Repo-->>API : reviews[]
 API->>Theme : generateThemesFromReviews(reviews)
 Theme->>Groq : groqJson({system,user,schemaHint})
-Groq-->>Theme : themes[]
+Groq-->>Theme : themes[] (with state machine parsing)
 Theme->>DB : upsertThemes(themes)
 Theme-->>API : themes[]
 ```
 
 **Diagram sources**
-- [server.ts:28-43](file://phase-2/src/api/server.ts#L28-L43)
+- [server.ts:144-159](file://phase-2/src/api/server.ts#L144-L159)
 - [reviewsRepo.ts:4-14](file://phase-2/src/services/reviewsRepo.ts#L4-L14)
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [groqClient.ts:30-56](file://phase-2/src/services/groqClient.ts#L30-L56)
-- [index.ts:7-22](file://phase-2/src/db/index.ts#L7-L22)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
+- [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
 
 **Section sources**
 - [themeService.ts:17-56](file://phase-2/src/services/themeService.ts#L17-L56)
 - [reviewsRepo.ts:4-14](file://phase-2/src/services/reviewsRepo.ts#L4-L14)
 
 ### Review-to-Theme Assignment with Confidence Scoring
-- Loads a week’s reviews and latest themes
-- Sends a batched prompt to Groq to assign each review to a theme or “Other”
+- Loads a week's reviews and latest themes
+- Sends a batched prompt to Groq to assign each review to a theme or "Other"
 - Persists assignments with optional confidence scores
 - Returns statistics for assigned and skipped items
 
@@ -263,18 +335,18 @@ API->>Theme : listLatestThemes(5)
 Theme-->>API : themes[]
 API->>Assign : assignWeekReviews(week_start)
 Assign->>Groq : groqJson(assignments schema)
-Groq-->>Assign : assignments[]
+Groq-->>Assign : assignments[] (enhanced parsing)
 Assign->>DB : persistAssignments(assignments)
 Assign-->>API : {assigned, skipped, themes}
 ```
 
 **Diagram sources**
-- [server.ts:56-70](file://phase-2/src/api/server.ts#L56-L70)
+- [server.ts:172-186](file://phase-2/src/api/server.ts#L172-L186)
 - [reviewsRepo.ts:16-24](file://phase-2/src/services/reviewsRepo.ts#L16-L24)
 - [themeService.ts:58-66](file://phase-2/src/services/themeService.ts#L58-L66)
 - [assignmentService.ts:27-113](file://phase-2/src/services/assignmentService.ts#L27-L113)
-- [groqClient.ts:30-67](file://phase-2/src/services/groqClient.ts#L30-L67)
-- [index.ts:24-38](file://phase-2/src/db/index.ts#L24-L38)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
+- [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
 
 **Section sources**
 - [assignmentService.ts:27-113](file://phase-2/src/services/assignmentService.ts#L27-L113)
@@ -296,7 +368,7 @@ API->>Pulse : generatePulse(week_start)
 Pulse->>Pulse : getWeekThemeStats(week_start)
 Pulse->>Pulse : pickQuotes(topThemeIds, reviews)
 Pulse->>Groq : generateActionIdeas(topThemes, quotes)
-Groq-->>Pulse : action_ideas[]
+Groq-->>Pulse : action_ideas[] (enhanced parsing)
 Pulse->>Groq : generateWeeklyNote(week_start, ...)
 Groq-->>Pulse : note_body
 Pulse->>Scrub : scrubPii(note_body)
@@ -306,10 +378,10 @@ Pulse-->>API : WeeklyPulse
 ```
 
 **Diagram sources**
-- [server.ts:76-90](file://phase-2/src/api/server.ts#L76-L90)
+- [server.ts:192-206](file://phase-2/src/api/server.ts#L192-L206)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
-- [groqClient.ts:30-67](file://phase-2/src/services/groqClient.ts#L30-L67)
-- [index.ts:40-57](file://phase-2/src/db/index.ts#L40-L57)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
+- [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
 
 **Section sources**
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
@@ -337,7 +409,7 @@ Email-->>API : void
 ```
 
 **Diagram sources**
-- [server.ts:123-154](file://phase-2/src/api/server.ts#L123-L154)
+- [server.ts:239-270](file://phase-2/src/api/server.ts#L239-L270)
 - [emailService.ts:9-129](file://phase-2/src/services/emailService.ts#L9-L129)
 - [env.ts:16-21](file://phase-2/src/config/env.ts#L16-L21)
 
@@ -373,6 +445,39 @@ Next --> ForEach
 **Section sources**
 - [schedulerJob.ts:52-97](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 
+### Enhanced API Configuration for Production
+- Production-ready CORS configuration with multiple frontend origins
+- Health check endpoint for container monitoring
+- Automatic database selection (SQLite vs PostgreSQL) based on environment
+- Environment-specific configuration management
+
+**Updated** Enhanced with production-ready CORS configuration and health checks for containerized deployments.
+
+```mermaid
+flowchart TD
+Start(["Server Startup"]) --> InitDB["initSchema()"]
+InitDB --> CheckEnv{"DATABASE_URL set?"}
+CheckEnv --> |Yes| UsePG["Use PostgreSQL"]
+CheckEnv --> |No| UseSQLite["Use SQLite"]
+UsePG --> InitPG["initPostgresSchema()"]
+UseSQLite --> InitSQLite["initSQLiteSchema()"]
+InitPG --> SetupCORS["Configure CORS for production"]
+InitSQLite --> SetupCORS
+SetupCORS --> HealthCheck["Add /health endpoint"]
+HealthCheck --> StartServer["Start Express server"]
+```
+
+**Diagram sources**
+- [server.ts:18-23](file://phase-2/src/api/server.ts#L18-L23)
+- [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
+- [server.ts:51-52](file://phase-2/src/api/server.ts#L51-L52)
+- [index.ts:13-19](file://phase-2/src/db/index.ts#L13-L19)
+- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
+
+**Section sources**
+- [server.ts:27-52](file://phase-2/src/api/server.ts#L27-L52)
+- [index.ts:6-7](file://phase-2/src/db/index.ts#L6-L7)
+
 ### User Preferences Management
 - Upserts preferences, deactivating previous active rows
 - Computes next send time based on preferred day of week and time
@@ -392,7 +497,7 @@ Pref-->>API : UserPrefsRow | null
 ```
 
 **Diagram sources**
-- [server.ts:160-212](file://phase-2/src/api/server.ts#L160-L212)
+- [server.ts:280-328](file://phase-2/src/api/server.ts#L280-L328)
 - [userPrefsRepo.ts:21-56](file://phase-2/src/services/userPrefsRepo.ts#L21-L56)
 - [index.ts:60-69](file://phase-2/src/db/index.ts#L60-L69)
 
@@ -405,6 +510,8 @@ Pref-->>API : UserPrefsRow | null
 - weekly_pulses: stores generated pulses with JSON payloads and versioning
 - user_preferences: stores user email and delivery preferences
 - scheduled_jobs: tracks scheduler execution status and errors
+
+**Updated** Enhanced with dual database support and automatic schema initialization.
 
 ```mermaid
 erDiagram
@@ -458,10 +565,12 @@ WEEKLY_PULSES ||--|| SCHEDULED_JOBS : "relates to"
 ```
 
 **Diagram sources**
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L7-L91)
+- [index.ts:7-128](file://phase-2/src/db/index.ts#L7-L128)
+- [postgres.ts:30-124](file://phase-2/src/db/postgres.ts#L30-L124)
 
 **Section sources**
-- [index.ts:7-91](file://phase-2/src/db/index.ts#L1-L93)
+- [index.ts:7-128](file://phase-2/src/db/index.ts#L1-L133)
+- [postgres.ts:27-135](file://phase-2/src/db/postgres.ts#L1-L143)
 
 ### API Endpoints
 - Theme management
@@ -479,24 +588,32 @@ WEEKLY_PULSES ||--|| SCHEDULED_JOBS : "relates to"
 - Email testing
   - POST /api/email/test: send a test email to verify SMTP setup
 - Debug convenience
-  - GET /api/reviews/week/:weekStart: list a week’s reviews
+  - GET /api/reviews/week/:weekStart: list a week's reviews
+- Production endpoints
+  - GET /health: health check endpoint for monitoring
+
+**Updated** Added health check endpoint for production monitoring and enhanced CORS configuration.
 
 **Section sources**
-- [server.ts:28-248](file://phase-2/src/api/server.ts#L28-L248)
+- [server.ts:28-382](file://phase-2/src/api/server.ts#L28-L382)
 
 ## Dependency Analysis
 - External libraries
-  - Express: web framework
-  - better-sqlite3: embedded database
-  - groq-sdk: Groq client
+  - Express: web framework with production-ready CORS
+  - better-sqlite3: embedded database for development
+  - groq-sdk: Groq client with enhanced JSON parsing
   - nodemailer: SMTP transport
   - zod: schema validation
   - dotenv: environment loading
+  - pg: PostgreSQL driver for production
 - Internal dependencies
   - API depends on services and repositories
   - Services depend on Groq client, Zod schemas, and database
   - Scheduler depends on pulse and email services and user preferences
-  - Scripts orchestrate full pipeline execution
+  - Scripts orchestrate full pipeline execution and database migration
+  - PostgreSQL module provides production database connectivity
+
+**Updated** Added PostgreSQL driver dependency for production deployments.
 
 ```mermaid
 graph LR
@@ -508,6 +625,7 @@ GroqSDK["groq-sdk"] --> Groq["groqClient.ts"]
 Nodemailer["nodemailer"] --> Email["emailService.ts"]
 Dotenv["dotenv"] --> Env["env.ts"]
 BetterSqlite3["better-sqlite3"] --> DB["db/index.ts"]
+Pg["pg"] --> PG["db/postgres.ts"]
 API --> Theme
 API --> Assign
 API --> Pulse
@@ -523,28 +641,34 @@ Email --> Env
 Scheduler["schedulerJob.ts"] --> Pulse
 Scheduler --> Email
 Scheduler --> Pref
+PG --> DB
+MIG["migrateToPostgres.ts"] --> PG
 ```
 
 **Diagram sources**
-- [package.json:13-28](file://phase-2/package.json#L13-L28)
-- [server.ts:1-13](file://phase-2/src/api/server.ts#L1-L13)
+- [package.json:13-23](file://phase-2/package.json#L13-L23)
+- [server.ts:1-16](file://phase-2/src/api/server.ts#L1-L16)
 - [groqClient.ts:1](file://phase-2/src/services/groqClient.ts#L1)
 - [emailService.ts:1](file://phase-2/src/services/emailService.ts#L1)
 - [env.ts:5](file://phase-2/src/config/env.ts#L5)
 - [index.ts:5](file://phase-2/src/db/index.ts#L5)
+- [postgres.ts:1](file://phase-2/src/db/postgres.ts#L1)
 
 **Section sources**
-- [package.json:13-28](file://phase-2/package.json#L13-L28)
+- [package.json:13-23](file://phase-2/package.json#L13-L23)
 
 ## Performance Considerations
 - Batched Groq calls: assignmentService processes reviews in small batches to manage token usage and cost
 - Schema-first prompts: strict schema hints reduce hallucinations and parsing overhead
+- Enhanced JSON parsing: state machine algorithm improves reliability and reduces parsing failures
+- Dual database support: automatic selection optimizes for development vs production environments
 - SQLite indexing: unique indexes on themes and weekly pulses prevent duplicates and speed lookups
 - Retry with jittered temperature: improves resilience without excessive retries
 - PII scrubbing: minimal regex passes ensure safe outputs before persistence or email
 - Scheduler cadence: default 5-minute intervals balance timeliness and resource usage
+- PostgreSQL connection pooling: efficient resource utilization in production
 
-[No sources needed since this section provides general guidance]
+**Updated** Enhanced with improved JSON parsing reliability and PostgreSQL connection pooling for production.
 
 ## Troubleshooting Guide
 - Groq API key missing
@@ -562,23 +686,36 @@ Scheduler --> Pref
 - Scheduler not starting
   - Symptom: scheduler logs indicate not started
   - Resolution: set GROQ_API_KEY to enable automatic scheduler start
+- Database connection issues
+  - Symptom: PostgreSQL connection errors in production
+  - Resolution: ensure DATABASE_URL environment variable is set correctly
+- JSON parsing failures
+  - Symptom: Groq responses not properly parsed
+  - Resolution: enhanced state machine algorithm handles malformed JSON more reliably
+- Migration failures
+  - Symptom: PostgreSQL migration errors
+  - Resolution: verify Phase 1 SQLite database exists and PostgreSQL connection is available
 - Email delivery failures
   - Use the test endpoint to validate SMTP configuration
 - Pipeline script issues
   - Ensure database initialization and recent reviews exist before running the pipeline
 
+**Updated** Added troubleshooting for database connection issues, JSON parsing failures, and migration failures.
+
 **Section sources**
-- [groqClient.ts:35-37](file://phase-2/src/services/groqClient.ts#L35-L37)
+- [groqClient.ts:98-100](file://phase-2/src/services/groqClient.ts#L98-L100)
 - [emailService.ts:99-112](file://phase-2/src/services/emailService.ts#L99-L112)
 - [pulseService.ts:179-188](file://phase-2/src/services/pulseService.ts#L179-L188)
-- [server.ts:257-262](file://phase-2/src/api/server.ts#L257-L262)
+- [server.ts:374-378](file://phase-2/src/api/server.ts#L374-L378)
+- [postgres.ts:8-11](file://phase-2/src/db/postgres.ts#L8-L11)
+- [migrateToPostgres.ts:104-107](file://phase-2/scripts/migrateToPostgres.ts#L104-L107)
 - [testEmail.ts:1-16](file://phase-2/scripts/testEmail.ts#L1-L16)
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 
 ## Conclusion
-Phase 2 delivers a production-grade, AI-powered analytics pipeline that transforms app store reviews into actionable insights. By combining structured prompts, schema validation, and robust persistence, it ensures reliable theme generation, accurate assignments, and high-quality weekly pulses. The email service and scheduler automate delivery based on user preferences, while the API exposes clear endpoints for operational control. Extensive logging, error handling, and testing support ongoing maintenance and scaling.
+Phase 2 delivers a production-grade, AI-powered analytics pipeline that transforms app store reviews into actionable insights. By combining structured prompts, schema validation, and robust persistence, it ensures reliable theme generation, accurate assignments, and high-quality weekly pulses. The enhanced JSON parsing with state machine algorithm improves reliability, while dual database support enables seamless development and production deployments. The email service and scheduler automate delivery based on user preferences, while the API exposes clear endpoints for operational control. Extensive logging, error handling, and testing support ongoing maintenance and scaling. PostgreSQL migration capabilities ensure smooth transition to production environments.
 
-[No sources needed since this section summarizes without analyzing specific files]
+**Updated** Enhanced with improved JSON parsing reliability, PostgreSQL migration capabilities, and production-ready deployment configuration.
 
 ## Appendices
 
@@ -587,12 +724,12 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
 - LLM Interaction Example
   - Generate themes from recent reviews
     - Endpoint: POST /api/themes/generate
-    - Behavior: loads recent reviews, calls Groq with schema hint, validates with Zod, upserts themes
-    - Reference: [server.ts:28-43](file://phase-2/src/api/server.ts#L28-L43), [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
+    - Behavior: loads recent reviews, calls Groq with schema hint, enhanced JSON parsing, validates with Zod, upserts themes
+    - Reference: [server.ts:144-159](file://phase-2/src/api/server.ts#L144-L159), [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
   - Assign reviews to themes with confidence
     - Endpoint: POST /api/themes/assign
-    - Behavior: batched Groq prompts, Zod validation, persisted assignments
-    - Reference: [server.ts:56-70](file://phase-2/src/api/server.ts#L56-L70), [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
+    - Behavior: batched Groq prompts, enhanced JSON parsing, Zod validation, persisted assignments
+    - Reference: [server.ts:172-186](file://phase-2/src/api/server.ts#L172-L186), [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
 
 - Scheduling Workflow Example
   - Automatic pulse delivery
@@ -600,13 +737,28 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
     - Reference: [schedulerJob.ts:52-97](file://phase-2/src/jobs/schedulerJob.ts#L52-L97)
   - Manual pulse generation
     - Endpoint: POST /api/pulses/generate
-    - Reference: [server.ts:76-90](file://phase-2/src/api/server.ts#L76-L90), [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
+    - Reference: [server.ts:192-206](file://phase-2/src/api/server.ts#L192-L206), [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 
 - Email Automation Example
   - Send pulse via email
     - Endpoint: POST /api/pulses/:id/send-email
     - Behavior: resolves recipient from body or user preferences, builds HTML/text, scrubs PII, sends
-    - Reference: [server.ts:123-154](file://phase-2/src/api/server.ts#L123-L154), [emailService.ts:9-129](file://phase-2/src/services/emailService.ts#L9-L129)
+    - Reference: [server.ts:239-270](file://phase-2/src/api/server.ts#L239-L270), [emailService.ts:9-129](file://phase-2/src/services/emailService.ts#L9-L129)
+
+- PostgreSQL Migration Example
+  - Migrate from SQLite to PostgreSQL
+    - Script: scripts/migrateToPostgres.ts
+    - Behavior: initializes PostgreSQL schema, migrates all tables with data preservation
+    - Reference: [migrateToPostgres.ts:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
+
+- Production Deployment Example
+  - Health check monitoring
+    - Endpoint: GET /health
+    - Behavior: returns application health status for container monitoring
+    - Reference: [server.ts:51-52](file://phase-2/src/api/server.ts#L51-L52)
+  - CORS configuration
+    - Behavior: allows multiple frontend origins in production
+    - Reference: [server.ts:27-48](file://phase-2/src/api/server.ts#L27-L48)
 
 - End-to-End Pipeline Script
   - Full pipeline execution
@@ -614,10 +766,13 @@ Phase 2 delivers a production-grade, AI-powered analytics pipeline that transfor
     - Steps: init schema, generate themes, assign themes, generate pulse, send email
     - Reference: [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)
 
+**Updated** Added PostgreSQL migration and production deployment examples.
+
 **Section sources**
-- [server.ts:28-154](file://phase-2/src/api/server.ts#L28-L154)
+- [server.ts:144-270](file://phase-2/src/api/server.ts#L144-L270)
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
 - [assignmentService.ts:27-67](file://phase-2/src/services/assignmentService.ts#L27-L67)
 - [pulseService.ts:179-241](file://phase-2/src/services/pulseService.ts#L179-L241)
 - [emailService.ts:9-129](file://phase-2/src/services/emailService.ts#L9-L129)
+- [migrateToPostgres.ts:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
 - [runPulsePipeline.ts:14-49](file://phase-2/scripts/runPulsePipeline.ts#L14-L49)

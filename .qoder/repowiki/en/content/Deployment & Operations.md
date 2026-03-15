@@ -16,6 +16,8 @@
 - [phase-2 pulse service](file://phase-2/src/services/pulseService.ts)
 - [phase-2 theme service](file://phase-2/src/services/themeService.ts)
 - [phase-2 user prefs repo](file://phase-2/src/services/userPrefsRepo.ts)
+- [phase-2 groq client](file://phase-2/src/services/groqClient.ts)
+- [phase-2 migrate script](file://phase-2/scripts/migrateToPostgres.ts)
 - [Dockerfile](file://Dockerfile)
 - [docker-compose.yml](file://phase-2/docker-compose.yml)
 - [render.yaml](file://phase-2/render.yaml)
@@ -39,11 +41,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced PostgreSQL deployment support for Render platform with dedicated PostgreSQL connection pool
-- Updated Docker configuration for production readiness with improved database connection handling
-- Implemented dual database support (SQLite for development, PostgreSQL for production) with automatic selection
-- Added PostgreSQL-specific schema initialization and connection pooling
-- Improved database connection handling with SSL configuration for Render compatibility
+- Added comprehensive PostgreSQL migration script (phase-2/scripts/migrateToPostgres.ts) with 110-line data migration solution from SQLite to PostgreSQL
+- Enhanced CORS configuration in API server for Vercel deployment with dynamic allowed origins
+- Improved JSON parsing reliability with state machine algorithm in Groq client
+- Updated PostgreSQL deployment support with dedicated connection pool and SSL configuration
+- Enhanced database connection handling with SSL configuration for Render compatibility
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -97,6 +99,7 @@ P2DB["Dual DB Support<br/>SQLite (dev) / PostgreSQL (prod)"]
 SCH["Scheduler Job<br/>runSchedulerOnce()"]
 EMAIL["Email Service<br/>sendPulseEmail(), sendTestEmail()"]
 GROQ["Groq Client<br/>groqJson()"]
+MIGRATE["Migration Script<br/>migrateToPostgres()"]
 TESTS["Testing Framework<br/>Node.js built-in test runner"]
 end
 subgraph "Phase 3 - Frontend"
@@ -115,6 +118,7 @@ SCH --> EMAIL
 P2S --> GROQ
 P2S --> P2DB
 P2S --> TESTS
+P2S --> MIGRATE
 FRONTEND --> P2S
 FRONTEND --> VERCEL
 DOCKER --> P2S
@@ -131,6 +135,7 @@ COMPOSE --> DOCKER
 - [phase-2 scheduler:1-98](file://phase-2/src/jobs/schedulerJob.ts#L1-L98)
 - [phase-2 email service:1-142](file://phase-2/src/services/emailService.ts#L1-L142)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
+- [phase-2 migrate script:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 - [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 - [phase-3 vite.config.ts:1-20](file://phase-3/vite.config.ts#L1-L20)
 - [Dockerfile:1-42](file://Dockerfile#L1-L42)
@@ -156,13 +161,15 @@ COMPOSE --> DOCKER
 - Email Delivery
   - SMTP-based transport with HTML/text bodies and PII scrubbing.
 - LLM Integration
-  - Groq client with retries and JSON extraction for structured outputs.
+  - Groq client with enhanced JSON extraction using state machine algorithm for structured outputs.
 - Logging
   - Console-based logging with INFO/ERROR helpers.
 - Testing Framework
   - Comprehensive test suite using Node.js built-in test runner with isolated test files for different components.
 - Frontend Dashboard
   - React-based dashboard with client-side routing, integrated with backend APIs via proxy configuration.
+- **New** Data Migration Tool
+  - PostgreSQL migration script for seamless SQLite to PostgreSQL data transfer.
 
 **Section sources**
 - [phase-1 server:1-50](file://phase-1/src/api/server.ts#L1-L50)
@@ -175,10 +182,12 @@ COMPOSE --> DOCKER
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
 - [phase-2 theme service:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [phase-2 logger:1-21](file://phase-2/src/core/logger.ts#L1-L21)
+- [phase-2 groq client:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
+- [phase-2 migrate script:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
 - [phase-3 App.tsx:1-57](file://phase-3/src/App.tsx#L1-L57)
 
 ## Architecture Overview
-The system comprises two primary runtime phases with containerized deployment capabilities and a modern frontend deployment strategy, now featuring enhanced PostgreSQL support for production environments:
+The system comprises two primary runtime phases with containerized deployment capabilities and a modern frontend deployment strategy, now featuring enhanced PostgreSQL support for production environments and improved data migration capabilities:
 - Phase 1: Standalone API for scraping and storing reviews into SQLite.
 - Phase 2: Full-featured API with theming, pulse generation, scheduled emails, and persistence, supporting both SQLite (development) and PostgreSQL (production) databases.
 - Phase 3: React frontend with Vercel deployment and client-side routing.
@@ -253,6 +262,24 @@ Operational notes:
 - [phase-2 server:28-232](file://phase-2/src/api/server.ts#L28-L232)
 - [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
+### Enhanced CORS Configuration
+**New** The API server now features an improved CORS configuration that provides enhanced security and flexibility for Vercel deployment:
+
+**Dynamic Origin Management**
+- Static origins: Multiple Vercel preview domains for the Groww App Review Insights Analyzer
+- Dynamic origin: FRONTEND_URL environment variable for custom domain support
+- Production mode: Strict origin validation with allowed origins whitelist
+- Development mode: Permissive CORS for local development and testing
+
+**Implementation Details**
+- Origin validation function with comprehensive error handling
+- Credentials support for authenticated requests
+- Graceful handling of requests with no origin (mobile apps, curl, etc.)
+- Environment-aware configuration for different deployment scenarios
+
+**Section sources**
+- [phase-2 server:27-48](file://phase-2/src/api/server.ts#L27-L48)
+
 ### Dual Database Support
 - Phase 1
   - reviews: id, platform, rating, title, text, clean_text, created_at, week_start, week_end, has_unicode.
@@ -302,6 +329,31 @@ SQLiteDB --> Ready
 - [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 - [phase-2 postgres:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
 
+### PostgreSQL Migration Script
+**New** A comprehensive 110-line migration script has been added to facilitate seamless data transfer from SQLite to PostgreSQL:
+
+**Migration Capabilities**
+- Complete data transfer from SQLite database to PostgreSQL
+- Support for all core entities: reviews, themes, review_themes, weekly_pulses, user_preferences, scheduled_jobs
+- Conflict resolution using ON CONFLICT (id) DO NOTHING strategy
+- Preserves data integrity and maintains referential constraints
+
+**Migration Process**
+- Initializes PostgreSQL schema before data transfer
+- Connects to SQLite database using better-sqlite3
+- Processes each table sequentially with progress logging
+- Handles special cases like has_unicode field conversion
+- Provides detailed migration statistics and completion status
+
+**Data Preservation Features**
+- Maintains unique identifiers across migration
+- Preserves temporal relationships and foreign key references
+- Handles JSON serialization for complex data structures
+- Ensures atomic operations for data consistency
+
+**Section sources**
+- [phase-2 migrate script:1-111](file://phase-2/scripts/migrateToPostgres.ts#L1-L111)
+
 ### Scheduler and Email Automation
 - Scheduler
   - Determines last full week (UTC), identifies due preferences, inserts a scheduled job row, generates the pulse, sends email, and updates job status.
@@ -344,6 +396,31 @@ Update --> Loop
 - [phase-2 theme service:1-68](file://phase-2/src/services/themeService.ts#L1-L68)
 - [phase-2 pulse service:1-265](file://phase-2/src/services/pulseService.ts#L1-L265)
 
+### Enhanced JSON Parsing Reliability
+**New** The Groq client now features an improved state machine algorithm for more reliable JSON parsing:
+
+**State Machine Algorithm**
+- Character-by-character processing with proper quote and escape handling
+- Handles nested quotes and escaped characters correctly
+- Escapes newlines inside JSON strings while preserving content
+- Maintains context awareness for string boundaries
+
+**JSON Extraction Enhancements**
+- Removes control characters and non-printable characters
+- Strips markdown code fences (```json ... ``` or ```` ... ````)
+- Extracts JSON from mixed content using bracket matching
+- Provides detailed error context with position information
+
+**Robustness Improvements**
+- Handles malformed JSON gracefully with fallback strategies
+- Provides debug information for parsing failures
+- Implements retry mechanism with increasing temperature
+- Maintains backward compatibility with existing JSON structures
+
+**Section sources**
+- [phase-2 groq client:14-91](file://phase-2/src/services/groqClient.ts#L14-L91)
+- [phase-2 groq client:93-142](file://phase-2/src/services/groqClient.ts#L93-L142)
+
 ### Configuration and Environment
 - Phase 1
   - DATABASE_FILE, PORT.
@@ -376,7 +453,7 @@ Update --> Loop
   - Vite for frontend bundling and development server.
   - React development dependencies for frontend build process.
 
-**Updated** Added PostgreSQL driver (pg) for production database support.
+**Updated** Added PostgreSQL driver (pg) for production database support and enhanced JSON parsing capabilities.
 
 ```mermaid
 graph LR
@@ -395,6 +472,8 @@ FRONTEND --> Router["react-router-dom"]
 FRONTEND --> Axios["axios"]
 Vite["vite"] --> FRONTEND
 TESTS["Node.js Test Runner"] --> P2Server
+MIGRATE["Migration Script"] --> PG
+MIGRATE --> DB
 ```
 
 **Diagram sources**
@@ -422,6 +501,10 @@ TESTS["Node.js Test Runner"] --> P2Server
 - Frontend Performance
   - React component memoization and lazy loading for optimal bundle sizes.
   - Vite's development server with hot module replacement for fast iteration.
+- **New** Migration Performance
+  - PostgreSQL migration script optimized for sequential processing
+  - Conflict resolution minimizes write operations during data transfer
+  - Progress logging enables monitoring of long-running migrations
 
 ## Monitoring & Logging
 - Logging
@@ -717,6 +800,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - User Preferences: CRUD operations with active preference management
 - Schema Validation: Zod schema validation testing
 - **Updated**: Database connection testing for both SQLite and PostgreSQL modes
+- **New**: Migration script testing for data transfer validation
 
 **Test Architecture**
 - Each component has its own test file for focused testing
@@ -724,6 +808,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - Stubbing and mocking for external dependencies (Groq API, email services)
 - Comprehensive assertion coverage for business logic validation
 - **Updated**: Database mode switching for testing both SQLite and PostgreSQL paths
+- **New**: Migration validation tests for data integrity verification
 
 **Test Execution**
 - Built-in Node.js test runner (`node --test`)
@@ -746,6 +831,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - **User Preferences**: Confirms CRUD operations, active preference management, and data validation
 - **Schema Validation**: Validates Zod schema parsing and type safety
 - **Database Support**: Tests automatic database selection and schema initialization for both SQLite and PostgreSQL modes
+- **Migration Testing**: Validates data integrity and migration completeness for PostgreSQL transfer
 
 **Section sources**
 - [phase-2 assignment.test.ts:57-92](file://phase-2/src/tests/assignment.test.ts#L57-L92)
@@ -783,6 +869,11 @@ The project implements a comprehensive testing framework using Node.js built-in 
   - For PostgreSQL mode: verify DATABASE_URL format and connectivity.
   - For SQLite mode: check file permissions and path accessibility.
   - Monitor PostgreSQL pool error logs for connection troubleshooting.
+- **New** Migration Issues
+  - Verify PostgreSQL schema initialization before migration
+  - Check SQLite database connectivity and file permissions
+  - Monitor migration progress and handle conflicts appropriately
+  - Validate data integrity after migration completion
 
 **Section sources**
 - [phase-2 server:22-22](file://phase-2/src/api/server.ts#L22-L22)
@@ -794,6 +885,7 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [vercel.json:7-9](file://phase-3/vercel.json#L7-L9)
 - [vite.config.ts:8-14](file://phase-3/vite.config.ts#L8-L14)
 - [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
+- [phase-2 migrate script:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
 
 ## Runbooks
 
@@ -836,6 +928,27 @@ The project implements a comprehensive testing framework using Node.js built-in 
 - [phase-2 env:8-11](file://phase-2/src/config/env.ts#L8-L11)
 - [phase-2 postgres:6-25](file://phase-2/src/db/postgres.ts#L6-L25)
 - [phase-2 db:14-15](file://phase-2/src/db/index.ts#L14-L15)
+
+### Runbook: Execute PostgreSQL Migration
+**New** Complete migration from SQLite to PostgreSQL database:
+
+**Migration Steps**
+- Verify PostgreSQL connection and schema initialization
+- Backup current SQLite database
+- Run migration script: `node dist/scripts/migrateToPostgres.js`
+- Monitor migration progress and handle any conflicts
+- Validate data integrity and referential constraints
+- Update environment to use DATABASE_URL for PostgreSQL
+- Test all API endpoints for data consistency
+
+**Expected Outcome**
+- Complete data transfer from SQLite to PostgreSQL
+- All entities migrated with proper relationships preserved
+- Application seamlessly operates on PostgreSQL backend
+
+**Section sources**
+- [phase-2 postgres:27-135](file://phase-2/src/db/postgres.ts#L27-L135)
+- [phase-2 migrate script:5-108](file://phase-2/scripts/migrateToPostgres.ts#L5-L108)
 
 ### Runbook: Investigate Scheduled Emails
 - Steps
@@ -929,6 +1042,26 @@ The project implements a comprehensive testing framework using Node.js built-in 
 **Section sources**
 - [phase-2 server:22-35](file://phase-2/src/api/server.ts#L22-L35)
 
+### Runbook: Validate JSON Parsing Reliability
+**New** Test and validate the enhanced JSON parsing capabilities:
+
+**Validation Steps**
+- Test Groq client with various JSON formats and edge cases
+- Verify state machine algorithm handles nested quotes correctly
+- Check escape character handling in strings
+- Validate markdown fence stripping functionality
+- Test error handling and debug information output
+- Monitor retry mechanism effectiveness
+
+**Expected Outcome**
+- Reliable JSON extraction from various input formats
+- Proper handling of malformed JSON with graceful degradation
+- Accurate error reporting and debugging information
+
+**Section sources**
+- [phase-2 groq client:14-91](file://phase-2/src/services/groqClient.ts#L14-L91)
+- [phase-2 groq client:93-142](file://phase-2/src/services/groqClient.ts#L93-L142)
+
 ## Conclusion
 This guide outlines a practical, layered approach to deploying and operating the Groww App Review Insights Analyzer with modern containerization practices and comprehensive frontend deployment support. The recent enhancements significantly improve the deployment experience and operational efficiency:
 
@@ -940,9 +1073,14 @@ This guide outlines a practical, layered approach to deploying and operating the
 - **Node.js 20.x Standardization**: Consistent runtime environment across all phases using engines specification
 - **Vercel Permission Fixes**: Implementation of npx --yes commands eliminates build-time prompts and improves CI/CD reliability
 - **Centralized Build Orchestration**: Streamlined multi-phase build process through root package.json coordination
+- **Comprehensive Data Migration**: 110-line migration script enabling seamless SQLite to PostgreSQL data transfer
+- **Reliable JSON Parsing**: State machine algorithm ensures robust JSON extraction from LLM responses
+- **Enhanced Security**: Dynamic CORS configuration with flexible origin management for Vercel deployment
 
 The dual database support creates a robust foundation for both development and production environments, allowing seamless migration between SQLite for local development and PostgreSQL for scalable production deployments. The enhanced PostgreSQL deployment with Render compatibility ensures reliable cloud-native operation with proper SSL configuration and connection pooling.
 
 The Vercel configuration with framework support, rewrite rules for client-side routing, and standardized Node.js runtime creates a robust foundation for both backend and frontend deployment strategies. The enhanced CORS setup with dynamic origins provides improved security while maintaining flexibility for custom domains.
+
+The addition of the comprehensive migration script addresses the critical need for data portability, enabling organizations to transition from SQLite development to PostgreSQL production without data loss. The enhanced JSON parsing reliability ensures more robust LLM integration with improved error handling and debugging capabilities.
 
 By implementing comprehensive testing frameworks, production-ready orchestration configurations, robust containerization strategies, and modern frontend deployment practices with enhanced CORS security, teams can operate reliably across development, staging, and production environments while maintaining strong observability, security, and operational hygiene.

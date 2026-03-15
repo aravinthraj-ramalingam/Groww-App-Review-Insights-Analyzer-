@@ -15,7 +15,7 @@ async function migrate() {
     
     // Migrate reviews
     logInfo('Migrating reviews...');
-    const reviews = sqliteDb.prepare('SELECT * FROM reviews').all();
+    const reviews = sqliteDb.prepare('SELECT * FROM reviews').all() as any[];
     for (const review of reviews) {
       await pool.query(
         `INSERT INTO reviews (id, platform, rating, title, text, clean_text, author, created_at, week_start, week_end, has_unicode)
@@ -30,7 +30,7 @@ async function migrate() {
     
     // Migrate themes
     logInfo('Migrating themes...');
-    const themes = sqliteDb.prepare('SELECT * FROM themes').all();
+    const themes = sqliteDb.prepare('SELECT * FROM themes').all() as any[];
     for (const theme of themes) {
       await pool.query(
         `INSERT INTO themes (id, name, description, created_at, valid_from, valid_to)
@@ -44,7 +44,7 @@ async function migrate() {
     
     // Migrate review_themes
     logInfo('Migrating review_themes...');
-    const reviewThemes = sqliteDb.prepare('SELECT * FROM review_themes').all();
+    const reviewThemes = sqliteDb.prepare('SELECT * FROM review_themes').all() as any[];
     for (const rt of reviewThemes) {
       await pool.query(
         `INSERT INTO review_themes (id, review_id, theme_id, confidence)
@@ -57,7 +57,7 @@ async function migrate() {
     
     // Migrate weekly_pulses
     logInfo('Migrating weekly_pulses...');
-    const pulses = sqliteDb.prepare('SELECT * FROM weekly_pulses').all();
+    const pulses = sqliteDb.prepare('SELECT * FROM weekly_pulses').all() as any[];
     for (const pulse of pulses) {
       await pool.query(
         `INSERT INTO weekly_pulses (id, week_start, week_end, top_themes, user_quotes, action_ideas, note_body, created_at, version)
@@ -72,7 +72,7 @@ async function migrate() {
     
     // Migrate user_preferences
     logInfo('Migrating user_preferences...');
-    const prefs = sqliteDb.prepare('SELECT * FROM user_preferences').all();
+    const prefs = sqliteDb.prepare('SELECT * FROM user_preferences').all() as any[];
     for (const pref of prefs) {
       await pool.query(
         `INSERT INTO user_preferences (id, email, timezone, preferred_day_of_week, preferred_time, created_at, updated_at, active)
@@ -86,7 +86,7 @@ async function migrate() {
     
     // Migrate scheduled_jobs
     logInfo('Migrating scheduled_jobs...');
-    const jobs = sqliteDb.prepare('SELECT * FROM scheduled_jobs').all();
+    const jobs = sqliteDb.prepare('SELECT * FROM scheduled_jobs').all() as any[];
     for (const job of jobs) {
       await pool.query(
         `INSERT INTO scheduled_jobs (id, user_preference_id, week_start, scheduled_at_utc, sent_at_utc, status, last_error)

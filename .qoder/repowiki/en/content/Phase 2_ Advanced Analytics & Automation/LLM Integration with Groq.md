@@ -17,10 +17,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced JSON parsing reliability section with improved control character cleanup
-- Added comprehensive debugging capabilities documentation with detailed error logging
-- Updated troubleshooting guide with enhanced debugging procedures
-- Added intelligent newline escaping documentation for LLM response parsing
+- Enhanced JSON parsing reliability section with comprehensive state machine algorithm for nested quotes and escaped characters
+- Updated intelligent newline escaping documentation to reflect state machine improvements
+- Added detailed state machine implementation analysis for complex JSON structures
+- Updated troubleshooting guide with enhanced debugging procedures for state machine parsing
+- Revised performance considerations to account for state machine complexity
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -37,7 +38,7 @@
 12. [Appendices](#appendices)
 
 ## Introduction
-This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. It also covers the assignment of reviews to themes, weekly pulse generation, and safeguards against PII exposure. The system now features enhanced JSON parsing reliability with improved control character cleanup, intelligent newline escaping, and comprehensive debugging capabilities with detailed error logging for troubleshooting failed API responses. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
+This document explains the LLM integration with Groq in Phase 2, focusing on the GroqClient implementation, prompt engineering strategies, JSON schema validation, error handling and retry logic, and the end-to-end theme generation workflow. It also covers the assignment of reviews to themes, weekly pulse generation, and safeguards against PII exposure. The system now features significantly enhanced JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. Practical examples illustrate prompt construction, response parsing, and error recovery. Finally, it outlines performance optimization, rate limiting considerations, and cost management strategies.
 
 ## Project Structure
 Phase 2 builds upon Phase 1's SQLite database and introduces new services for Groq-powered insights:
@@ -82,7 +83,7 @@ SCRUB --> PULSE
 
 **Diagram sources**
 - [env.ts:1-23](file://phase-2/src/config/env.ts#L1-L23)
-- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 - [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
 - [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
@@ -95,7 +96,7 @@ SCRUB --> PULSE
 - [package.json:1-30](file://phase-2/package.json#L1-L30)
 
 ## Core Components
-- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions with enhanced control character cleanup and intelligent newline escaping.
+- GroqClient: Initializes the Groq SDK client from environment variables and provides a generic JSON extraction and retry mechanism for chat completions with enhanced control character cleanup, intelligent newline escaping, and sophisticated state machine parsing for complex JSON structures.
 - ThemeService: Generates themes from recent reviews using structured prompts and validates outputs via Zod schemas.
 - AssignmentService: Assigns reviews to themes with confidence scores, batching requests to manage token usage.
 - PulseService: Aggregates weekly insights, generates action ideas and a concise weekly note, enforces word limits, and scrubs PII.
@@ -103,7 +104,7 @@ SCRUB --> PULSE
 - Validation: Zod schemas ensure strict typing and shape guarantees for all LLM responses.
 
 **Section sources**
-- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 - [themeService.ts:1-80](file://phase-2/src/services/themeService.ts#L1-L80)
 - [assignmentService.ts:1-118](file://phase-2/src/services/assignmentService.ts#L1-L118)
 - [pulseService.ts:1-270](file://phase-2/src/services/pulseService.ts#L1-L270)
@@ -126,7 +127,7 @@ ThemeSvc->>ThemeSvc : "Build system/user prompts<br/>Define schema hint"
 ThemeSvc->>GroqCli : "Call groqJson({ system, user, schemaHint })"
 GroqCli->>GroqAPI : "chat.completions.create(model, messages)"
 GroqAPI-->>GroqCli : "Raw response text"
-GroqCli->>GroqCli : "Enhanced extractJson() with control char cleanup<br/>Intelligent newline escaping<br/>Comprehensive debugging"
+GroqCli->>GroqCli : "Enhanced extractJson() with state machine algorithm<br/>Control char cleanup<br/>Intelligent newline escaping<br/>Comprehensive debugging"
 GroqCli-->>ThemeSvc : "Parsed JSON"
 ThemeSvc->>ThemeSvc : "Zod parse and return themes"
 ThemeSvc-->>Client : "Theme array"
@@ -134,7 +135,7 @@ ThemeSvc-->>Client : "Theme array"
 
 **Diagram sources**
 - [themeService.ts:17-37](file://phase-2/src/services/themeService.ts#L17-L37)
-- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
 
 ## Detailed Component Analysis
 
@@ -144,7 +145,12 @@ ThemeSvc-->>Client : "Theme array"
   - Removing ALL control characters and non-printable characters (keeping only printable ASCII 32-126 and common whitespace)
   - Stripping zero-width spaces and replacement characters
   - Handling markdown code fences with intelligent fallback to brace-matching
-  - Fixing unescaped newlines inside JSON strings with intelligent escaping
+  - Fixing unescaped newlines inside JSON strings with sophisticated state machine algorithm
+- State Machine Algorithm: Implements a comprehensive state machine that properly handles:
+  - Nested quotes within JSON strings
+  - Escaped characters (backslashes) that precede quotes
+  - Complex JSON structures with multiple levels of nesting
+  - Proper escape sequence preservation during newline conversion
 - Retry Logic: Attempts up to three times with incremental temperature increases to improve deterministic JSON output on retries.
 - Request Construction: Sends a system message and a user message that includes a strict instruction to return only valid JSON and a schema hint.
 
@@ -154,21 +160,21 @@ Start(["groqJson(params)"]) --> CheckKey["Check Groq client availability"]
 CheckKey --> |Unavailable| ThrowErr["Throw error: GROQ_API_KEY not set"]
 CheckKey --> |Available| Loop["Loop attempts 1..3"]
 Loop --> TryCall["Call chat.completions.create"]
-TryCall --> ParseResp["Enhanced extractJson() with:<br/>- Control char cleanup<br/>- Intelligent newline escaping<br/>- Fence stripping"]
+TryCall --> ParseResp["Enhanced extractJson() with:<br/>- Control char cleanup<br/>- State machine newline escaping<br/>- Fence stripping<br/>- Complex JSON handling"]
 ParseResp --> Validate["JSON.parse() with comprehensive debugging"]
 Validate --> Success{"Parse OK?"}
 Success --> |Yes| ReturnVal["Return parsed value"]
-Success --> |No| DebugInfo["Log detailed error info:<br/>- Position<br/>- Content preview<br/>- Raw content preview"]
+Success --> |No| DebugInfo["Log detailed error info:<br/>- Position<br/>- Context preview<br>- Full content length"]
 DebugInfo --> NextAttempt["Increment attempt and increase temperature"]
 NextAttempt --> Loop
 Loop --> |Exhausted| FinalErr["Log final error and throw"]
 ```
 
 **Diagram sources**
-- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
 
 **Section sources**
-- [groqClient.ts:1-94](file://phase-2/src/services/groqClient.ts#L1-L94)
+- [groqClient.ts:1-142](file://phase-2/src/services/groqClient.ts#L1-L142)
 
 ### Prompt Engineering Strategies
 - Role Definitions: System messages define the persona (product analyst) and constraints (no PII, concise output).
@@ -216,7 +222,7 @@ C --> |No| E["Throw validation error"]
 
 ### Theme Generation Workflow
 - Input: Reviews are sampled and cleaned; a system role defines the analyst persona and PII constraints; a user prompt enumerates review excerpts.
-- Processing: Calls groqJson with a schema hint for an array of themes using enhanced JSON parsing.
+- Processing: Calls groqJson with a schema hint for an array of themes using enhanced JSON parsing with state machine algorithm.
 - Output: Zod-parsed themes are returned and persisted via upsert.
 
 ```mermaid
@@ -234,7 +240,7 @@ Svc-->>Svc : "Return theme list"
 
 **Diagram sources**
 - [themeService.ts:17-49](file://phase-2/src/services/themeService.ts#L17-L49)
-- [groqClient.ts:49-92](file://phase-2/src/services/groqClient.ts#L49-L92)
+- [groqClient.ts:93-140](file://phase-2/src/services/groqClient.ts#L93-L140)
 - [index.ts:7-52](file://phase-2/src/db/index.ts#L7-L52)
 
 **Section sources**
@@ -242,7 +248,7 @@ Svc-->>Svc : "Return theme list"
 
 ### Review Assignment to Themes
 - Input: Weekly reviews and latest themes.
-- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson with enhanced parsing, parses assignments, and persists mappings with optional confidence.
+- Processing: Iterates over reviews in batches, constructs a user prompt with allowed themes, calls groqJson with enhanced parsing using state machine algorithm, parses assignments, and persists mappings with optional confidence.
 - Persistence: Uses an upsert to update confidence values for repeated runs.
 
 ```mermaid
@@ -389,10 +395,35 @@ PULSE --> SCRUB["piiScrubber.ts"]
 - Cost Control:
   - Choose appropriate models and tune temperature to balance quality and cost.
   - Monitor output length (word count) to avoid unnecessary tokens.
+- State Machine Complexity:
+  - The state machine algorithm adds computational overhead for complex JSON parsing.
+  - Performance impact is minimal compared to the benefits of reduced parsing failures.
 
 ## Enhanced JSON Parsing Reliability
 
-**Updated** The GroqClient now features significantly enhanced JSON parsing reliability with comprehensive control character cleanup and intelligent newline escaping mechanisms.
+**Updated** The GroqClient now features significantly enhanced JSON parsing reliability with a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs.
+
+### State Machine Algorithm Implementation
+The enhanced `extractJson` function implements a comprehensive state machine that tracks parsing state across complex JSON structures:
+
+#### Core State Tracking
+- **inString**: Boolean flag indicating whether the parser is currently inside a JSON string
+- **escaped**: Boolean flag tracking if the previous character was a backslash
+- **Character-by-character Processing**: Iterates through each character while maintaining state
+
+#### State Transitions
+The state machine handles four primary states:
+1. **Outside String**: Characters are preserved as-is
+2. **Inside String**: Special handling for quotes, backslashes, and control characters
+3. **Escaped Character**: Previous character was a backslash, preserve next character literally
+4. **Quote Boundary**: Handle opening and closing quotes appropriately
+
+#### Complex JSON Structure Handling
+The state machine algorithm excels at:
+- **Nested Quotes**: Properly identifies string boundaries even with nested quotes
+- **Escaped Characters**: Correctly preserves escaped quotes, backslashes, and other escape sequences
+- **Complex Nesting**: Handles arrays, objects, and mixed structures with multiple levels
+- **Mixed Content**: Processes strings containing both literal and escaped content
 
 ### Control Character Cleanup
 The enhanced `extractJson` function implements aggressive control character removal:
@@ -415,8 +446,38 @@ Implements intelligent markdown code fence detection and extraction:
 - Falls back to brace-matching algorithm when fences are absent
 - Trims whitespace while preserving structural integrity
 
+### State Machine Processing Flow
+```mermaid
+flowchart TD
+Start(["Input JSON String"]) --> Init["Initialize state:<br/>inString=false<br/>escaped=false"]
+Init --> Loop{"More characters?"}
+Loop --> |Yes| Char["Process character i"]
+Char --> CheckEsc{"Previous char was \\"? "}
+CheckEsc --> |Yes| Preserve["Preserve character<br/>Set escaped=false"]
+CheckEsc --> |No| CheckBackslash{"Char is \\"? "}
+CheckBackslash --> |Yes| MarkEsc["Mark escaped=true<br/>Add to result"]
+CheckBackslash --> |No| CheckQuote{"Char is '? "}
+CheckQuote --> |Yes| ToggleString["Toggle inString state<br/>Add to result"]
+CheckQuote --> |No| InString{"In string?"}
+InString --> |Yes| CheckControl{"Control character?"}
+CheckControl --> |Yes| Escape["Escape control char<br/>Add \\n, \\r, or \\t"]
+CheckControl --> |No| AddChar["Add character as-is"]
+InString --> |No| AddChar2["Add character as-is"]
+Escape --> Next["Next character"]
+AddChar --> Next
+AddChar2 --> Next
+ToggleString --> Next
+MarkEsc --> Next
+Preserve --> Next
+Next --> Loop
+Loop --> |No| End["Return processed JSON"]
+```
+
+**Diagram sources**
+- [groqClient.ts:35-88](file://phase-2/src/services/groqClient.ts#L35-L88)
+
 **Section sources**
-- [groqClient.ts:14-47](file://phase-2/src/services/groqClient.ts#L14-L47)
+- [groqClient.ts:14-91](file://phase-2/src/services/groqClient.ts#L14-L91)
 
 ## Comprehensive Debugging Capabilities
 
@@ -431,9 +492,10 @@ The enhanced error handling system provides comprehensive debugging information:
 
 ### Debug Information Structure
 When JSON parsing fails, the system logs:
-- `[DEBUG] JSON parse error at position: <error_message>`
-- `[DEBUG] Content preview (first 300 chars): <processed_json_preview>`
-- `[DEBUG] Raw content preview (first 300 chars): <raw_api_response_preview>`
+- `[DEBUG] JSON parse error: <error_message>`
+- `[DEBUG] Error around position <pos>:`
+- `[DEBUG] Context: ...<processed_json_preview>...`
+- `[DEBUG] Full content length: <length>`
 
 ### Error Recovery Flow
 The debugging-enabled retry mechanism:
@@ -443,7 +505,7 @@ The debugging-enabled retry mechanism:
 - Maintains error propagation while preserving diagnostic information
 
 **Section sources**
-- [groqClient.ts:75-83](file://phase-2/src/services/groqClient.ts#L75-L83)
+- [groqClient.ts:119-131](file://phase-2/src/services/groqClient.ts#L119-L131)
 
 ## Performance Considerations
 - Token Management:
@@ -461,6 +523,10 @@ The debugging-enabled retry mechanism:
 - Cost Control:
   - Choose appropriate models and tune temperature to balance quality and cost.
   - Monitor output length (word count) to avoid unnecessary tokens.
+- State Machine Performance:
+  - The state machine algorithm has O(n) time complexity where n is the length of the JSON string
+  - Memory usage is minimal, proportional to input size plus small constant overhead
+  - Performance impact is negligible compared to the dramatic reduction in parsing failures
 
 ## Troubleshooting Guide
 - Missing API Key:
@@ -469,6 +535,9 @@ The debugging-enabled retry mechanism:
 - Enhanced JSON Parsing Failures:
   - Symptom: Validation errors or groqJson throwing after retries with detailed debug logs.
   - Resolution: Check the debug logs for error positions and content previews; strengthen schema hints, enforce stricter instructions in prompts, and verify model consistency.
+- State Machine Issues:
+  - Symptom: Complex JSON structures still failing to parse despite state machine enhancements.
+  - Resolution: Review debug logs for specific character positions; check for unusual escape sequences or malformed JSON structures.
 - Control Character Issues:
   - Symptom: JSON parsing errors due to invisible characters or special Unicode.
   - Resolution: The enhanced parser automatically removes control characters; verify that the raw content preview shows clean JSON output.
@@ -486,12 +555,12 @@ The debugging-enabled retry mechanism:
   - Resolution: Trigger theme generation first; ensure weekly assignment runs after theme generation.
 
 **Section sources**
-- [groqClient.ts:54-92](file://phase-2/src/services/groqClient.ts#L54-L92)
+- [groqClient.ts:98-140](file://phase-2/src/services/groqClient.ts#L98-L140)
 - [pulseService.ts:162-171](file://phase-2/src/services/pulseService.ts#L162-L171)
 - [pulse.test.ts:49-85](file://phase-2/src/tests/pulse.test.ts#L49-L85)
 
 ## Conclusion
-Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation with significantly enhanced JSON parsing reliability. The system now features comprehensive control character cleanup, intelligent newline escaping, and detailed debugging capabilities with comprehensive error logging. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
+Phase 2 integrates Groq to power theme generation, review assignment, and weekly pulse creation with significantly enhanced JSON parsing reliability. The system now features a sophisticated state machine algorithm that properly handles nested quotes, escaped characters, and complex JSON structures, dramatically reducing parsing failures from large language model outputs. The GroqClient provides comprehensive control character cleanup, intelligent newline escaping, and detailed debugging capabilities with extensive error logging. Robust prompt engineering, strict JSON schema validation, and resilient retry logic ensure reliable outputs. Persistence is optimized with SQLite and Zod validations. By following the outlined practices—prompt discipline, batching, validation, PII scrubbing, and cost-conscious model selection—the system scales efficiently while maintaining data integrity and user safety.
 
 ## Appendices
 
@@ -535,6 +604,17 @@ Phase 2 integrates Groq to power theme generation, review assignment, and weekly
 - Analyze Error Positions: Use the logged character positions to identify problematic JSON segments.
 - Compare Content Previews: Examine both processed and raw content previews to understand transformation effects.
 - Monitor Retry Attempts: Track sequential failures to identify persistent issues.
+- State Machine Analysis: For complex JSON failures, examine the specific character positions where state transitions occur.
 
 **Section sources**
-- [groqClient.ts:75-83](file://phase-2/src/services/groqClient.ts#L75-L83)
+- [groqClient.ts:119-131](file://phase-2/src/services/groqClient.ts#L119-L131)
+
+### State Machine Algorithm Details
+The state machine algorithm provides several key advantages:
+- **Nested Quote Handling**: Correctly identifies string boundaries even with complex nested structures
+- **Escape Sequence Preservation**: Maintains proper escape sequences while fixing malformed JSON
+- **Performance Optimization**: Minimal memory overhead with linear time complexity
+- **Robust Error Recovery**: Handles edge cases that traditional regex-based approaches miss
+
+**Section sources**
+- [groqClient.ts:35-88](file://phase-2/src/services/groqClient.ts#L35-L88)
